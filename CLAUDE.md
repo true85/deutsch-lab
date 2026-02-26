@@ -37,7 +37,7 @@ pytest
 ```
 app/
 ├── main.py               # FastAPI 앱 진입점
-├── routers/              # 17개 API 라우터
+├── routers/              # 18개 API 라우터
 │   ├── words.py          # 단어 CRUD + 학습 상태
 │   ├── grammar.py        # 문법 CRUD + 학습 상태
 │   ├── expressions.py    # 표현 CRUD + 학습 상태
@@ -47,8 +47,10 @@ app/
 │   ├── user_state.py     # 사용자 학습 진도 (인증 필요)
 │   ├── search.py         # 벡터 유사도 검색
 │   ├── llm.py            # LLM 기능 (번역, 예문 생성 등)
+│   ├── teacher.py        # AI 선생님 (단어/문장 생성, 대화)
 │   └── ...
 ├── schemas/              # Pydantic 스키마 (입출력 검증)
+│   └── teacher.py        # AI Teacher 요청/응답 스키마
 ├── services/
 │   ├── sm2.py            # SM-2 간격 반복 알고리즘
 │   └── streaks.py        # 연속 학습 날짜 계산
@@ -57,9 +59,9 @@ app/
 │   ├── rate_limit.py     # 레이트 제한
 │   └── logging.py        # 요청 로깅
 └── llm/
-    ├── client.py         # OpenAI 클라이언트
+    ├── openai_client.py  # OpenAI 클라이언트 (chat_json, get_embedding)
     ├── prompts.py        # 프롬프트 템플릿
-    └── usage.py          # 토큰 사용량 추적
+    └── usage_tracker.py  # 토큰 사용량 추적
 streamlit_app.py          # Streamlit 웹 UI
 ```
 
@@ -118,6 +120,13 @@ async def endpoint(user_id: str = Depends(verify_api_key)):
 
 ### 80/20 추천 (`app/routers/recommend.py`)
 - 신규 콘텐츠 20% + 복습 필요 콘텐츠 80% 비율로 추천
+
+### AI 선생님 (`app/routers/teacher.py`)
+- `_build_user_profile(user_id)`: 공통 헬퍼 - 레벨/mastery/known_lemmas/weak_lemmas/weak_grammar 조회
+- `POST /teacher/generate-words`: 사용자 프로필 기반 맞춤 단어 생성 (테마 옵션)
+- `POST /teacher/generate-sentences`: 취약 문법 집중 연습 문장 생성 (빈칸/힌트 포함)
+- `POST /teacher/chat`: 히스토리 기반 개인화 대화 (free/correction/vocab_drill 모드)
+- 취약 판별 기준: `mastery_score < 0.5` (success_count 컬럼 미사용)
 
 ## 주요 DB 테이블
 
