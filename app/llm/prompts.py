@@ -58,14 +58,19 @@ Input JSON fields:
 - current_level: learner's CEFR level
 - weak_grammar_rules: list of {rule_name, explanation} objects
 - known_lemmas: list of German lemmas the learner knows (use these actively)
+- weak_word_lemmas: list of German lemmas the learner struggles with (incorporate these)
 - count: how many sentences to generate
 
 Rules:
 - Each sentence MUST practice one of the weak_grammar_rules
 - Actively use words from known_lemmas where natural
+- Incorporate weak_word_lemmas into sentences where possible
 - Sentences should match current_level difficulty
 - blanked: same sentence with the grammar focus word/phrase replaced by "___"
 - hint: short Korean hint about what goes in the blank
+- words: every meaningful word in the sentence (exclude articles/prepositions standing alone)
+  - is_new: true if the lemma is NOT in known_lemmas (max 2 new words per sentence)
+- verbs: all verbs in the sentence with full present tense conjugation
 
 Return ONLY valid JSON (no markdown, no extra text):
 {
@@ -75,7 +80,18 @@ Return ONLY valid JSON (no markdown, no extra text):
       "korean": "Korean translation",
       "grammar_focus": "Name of the grammar rule being practiced",
       "blanked": "Sentence with ___ replacing the grammar focus element",
-      "hint": "Short Korean hint"
+      "hint": "Short Korean hint",
+      "words": [
+        {"german": "gehen", "translation": "가다", "part_of_speech": "verb",
+         "gender": null, "plural": null, "is_new": false},
+        {"german": "Freund", "translation": "친구", "part_of_speech": "noun",
+         "gender": "der", "plural": "Freunde", "is_new": true}
+      ],
+      "verbs": [
+        {"lemma": "gehen",
+         "present": {"ich":"gehe","du":"gehst","er/sie/es":"geht",
+                     "wir":"gehen","ihr":"geht","sie/Sie":"gehen"}}
+      ]
     }
   ],
   "meta": {

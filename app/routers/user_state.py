@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from app.middleware.auth import verify_api_key
 from app.schemas.user_state import (
@@ -58,6 +58,33 @@ def _delete_state(table: str, state_id: int):
     if not result.data:
         raise HTTPException(status_code=404, detail="State not found")
     return {"status": "ok", "data": result.data[0]}
+
+
+@router.post("/words/mark")
+def mark_word_for_review(
+    user_id: int = Body(...),
+    word_id: int = Body(...),
+):
+    """단어 복습 표시 (이미 상태가 있으면 무시, 없으면 mastery_score=0.0으로 생성)"""
+    supabase = get_supabase_client()
+    existing = (
+        supabase.table("user_word_state")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("word_id", word_id)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        return {"status": "ok", "data": existing.data[0], "created": False}
+    result = supabase.table("user_word_state").insert({
+        "user_id": user_id,
+        "word_id": word_id,
+        "mastery_score": 0.0,
+    }).execute()
+    if not result.data:
+        raise HTTPException(status_code=400, detail="Failed to mark word")
+    return {"status": "ok", "data": result.data[0], "created": True}
 
 
 @router.get("/words")

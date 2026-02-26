@@ -24,12 +24,29 @@ class GenerateSentencesRequest(BaseModel):
     count: Optional[int] = 5
 
 
+class SentenceWord(BaseModel):
+    german: str
+    translation: str
+    part_of_speech: str  # verb | noun | adjective | adverb | other
+    gender: Optional[str] = None  # 명사만 해당
+    plural: Optional[str] = None
+    is_new: bool
+    word_id: Optional[int] = None  # DB에 저장된 id
+
+
+class VerbConjugation(BaseModel):
+    lemma: str
+    present: dict[str, str]  # {"ich": "gehe", "du": "gehst", ...}
+
+
 class GeneratedSentence(BaseModel):
     german: str
     korean: str
     grammar_focus: str
     blanked: Optional[str] = None
     hint: str
+    words: list[SentenceWord] = []
+    verbs: list[VerbConjugation] = []
 
 
 class ChatMessage(BaseModel):

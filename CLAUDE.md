@@ -156,6 +156,15 @@ async def endpoint(user_id: str = Depends(verify_api_key)):
   - 빈번한 업데이트: `hnsw`
 - **Embedding 생성**: 콘텐츠 추가 시 OpenAI text-embedding-ada-002 사용
 
+## 설계 문서
+
+기능 계획 / 구현 전 반드시 읽을 것:
+
+- `docs/learning-design.md` — 문장 중심 학습 시스템 핵심 설계
+  (학습 철학, 데이터 흐름, UI 규칙, TODO 포함)
+  새 기능 추가 또는 기존 기능 수정 시 이 문서를 먼저 확인하고,
+  설계가 바뀌면 반드시 이 문서도 함께 업데이트한다.
+
 ## 검증
 
 ```bash

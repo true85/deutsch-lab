@@ -73,3 +73,15 @@
 - [x] 배지/스트릭
 - [x] 데이터 내보내기/가져오기
 - [x] OCR/음성 기능(보류)
+
+### Phase 9 - 문장 중심 학습 시스템
+- [x] `SentenceWord`, `VerbConjugation` 스키마 추가 (`app/schemas/teacher.py`)
+- [x] LLM 프롬프트에 words/verbs 출력 포맷 추가 (`app/llm/prompts.py`)
+- [x] generate-sentences: is_new 단어 자동 DB 저장 + word_id 주입 (`app/routers/teacher.py`)
+- [x] `POST /user-state/words/mark` 엔드포인트 추가 — idempotent upsert (`app/routers/user_state.py`)
+- [x] 문장 학습 탭 UI: 동사 변화표, 단어 멀티셀렉트, 복습 표시 (`streamlit_app.py`)
+- [x] 라이트 테마 UI 전면 적용 (`streamlit_app.py`)
+- [x] 설계 문서 작성 (`docs/learning-design.md`)
+- [ ] SM-2 연동: 표시된 단어 next_review 기반 재등장 보장
+- [ ] 문장 즐겨찾기 기능
+- [ ] TTS 통합 (듣기 연습)

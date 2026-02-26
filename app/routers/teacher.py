@@ -98,6 +98,7 @@ def generate_words(req: GenerateWordsRequest):
 
 @router.post("/generate-sentences")
 def generate_sentences(req: GenerateSentencesRequest):
+    supabase = get_supabase_client()
     profile = _build_user_profile(req.user_id)
     weak_grammar = profile["weak_grammar_rules"] or [
         {"rule_name": f"{profile['current_level']} general", "explanation": ""}
@@ -106,11 +107,40 @@ def generate_sentences(req: GenerateSentencesRequest):
         "current_level": profile["current_level"],
         "weak_grammar_rules": weak_grammar[:5],
         "known_lemmas": profile["known_lemmas"][:50],
+        "weak_word_lemmas": profile["weak_word_lemmas"][:20],
         "count": req.count,
     }
     result = chat_json(SYSTEM_BASE + TEACHER_GENERATE_SENTENCES_PROMPT, json.dumps(user_prompt, ensure_ascii=False))
     if "sentences" not in result:
         raise HTTPException(status_code=502, detail="LLM이 올바른 응답을 반환하지 않았습니다.")
+
+    known_lower = {lemma.lower() for lemma in profile["known_lemmas"]}
+
+    for sentence in result["sentences"]:
+        for w in sentence.get("words", []):
+            lemma_lower = w["german"].lower()
+            if w.get("is_new"):
+                existing = supabase.table("words").select("id").ilike("german", w["german"]).limit(1).execute()
+                if existing.data:
+                    w["word_id"] = existing.data[0]["id"]
+                else:
+                    try:
+                        inserted = supabase.table("words").insert({
+                            "german": w["german"],
+                            "part_of_speech": w["part_of_speech"],
+                            "translation": w["translation"],
+                            "gender": w.get("gender"),
+                            "plural": w.get("plural"),
+                            "level": profile["current_level"],
+                            "frequency": "common",
+                        }).execute()
+                        w["word_id"] = inserted.data[0]["id"] if inserted.data else None
+                    except Exception:
+                        w["word_id"] = None
+            else:
+                row = supabase.table("words").select("id").ilike("german", w["german"]).limit(1).execute()
+                w["word_id"] = row.data[0]["id"] if row.data else None
+
     return {"status": "ok", "data": result}
 
 

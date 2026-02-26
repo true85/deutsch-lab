@@ -1,6 +1,3 @@
-import json
-from datetime import date
-
 import requests
 import streamlit as st
 
@@ -15,17 +12,17 @@ st.markdown(
 @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Space+Grotesk:wght@400;600;700&display=swap');
 
 :root {
-  --bg-1: #0b1220;
-  --bg-2: #13253b;
-  --bg-3: #1f2f27;
-  --accent: #f4c767;
-  --accent-2: #56d6bf;
-  --accent-3: #ff8a5b;
-  --ink: #f6f2ea;
-  --muted: #b8b3ab;
-  --panel: rgba(255,255,255,0.06);
-  --panel-strong: rgba(255,255,255,0.12);
-  --stroke: rgba(255,255,255,0.16);
+  --bg-1: #f4f7fc;
+  --bg-2: #edf2fb;
+  --bg-3: #ecf8f5;
+  --accent: #c98a00;
+  --accent-2: #0a8f78;
+  --accent-3: #d9541a;
+  --ink: #1a2340;
+  --muted: #6b7592;
+  --panel: rgba(255,255,255,0.75);
+  --panel-strong: rgba(255,255,255,0.95);
+  --stroke: rgba(0,0,0,0.10);
 }
 
 html, body {
@@ -43,14 +40,15 @@ h1, h2, h3, .hero-title {
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"] {
   background:
-    radial-gradient(1200px 520px at 10% 5%, #203a5b, transparent),
-    radial-gradient(900px 500px at 85% 15%, #244b38, transparent),
+    radial-gradient(1200px 520px at 10% 5%, #dde8ff, transparent),
+    radial-gradient(900px 500px at 85% 15%, #c8f5eb, transparent),
     linear-gradient(135deg, var(--bg-1), var(--bg-2)) !important;
   color: var(--ink) !important;
 }
 
 [data-testid="stSidebar"] {
-  background: rgba(11, 18, 32, 0.95) !important;
+  background: rgba(255, 255, 255, 0.97) !important;
+  border-right: 1px solid var(--stroke) !important;
   color: var(--ink) !important;
 }
 
@@ -69,8 +67,8 @@ p, span, div, label {
   inset: 0;
   background-image: repeating-linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.03) 0px,
-    rgba(255, 255, 255, 0.03) 1px,
+    rgba(0, 0, 0, 0.015) 0px,
+    rgba(0, 0, 0, 0.015) 1px,
     transparent 1px,
     transparent 8px
   );
@@ -87,7 +85,7 @@ p, span, div, label {
 .bg-orb {
   position: fixed;
   border-radius: 999px;
-  opacity: 0.35;
+  opacity: 0.4;
   z-index: 1;
 }
 
@@ -96,7 +94,7 @@ p, span, div, label {
   height: 380px;
   left: -120px;
   top: 120px;
-  background: radial-gradient(circle at 30% 30%, #ffe08a, transparent 65%);
+  background: radial-gradient(circle at 30% 30%, #fde68a, transparent 65%);
 }
 
 .orb-2 {
@@ -104,7 +102,7 @@ p, span, div, label {
   height: 460px;
   right: -160px;
   top: 40px;
-  background: radial-gradient(circle at 70% 30%, #5fe1c8, transparent 65%);
+  background: radial-gradient(circle at 70% 30%, #6ee7d4, transparent 65%);
 }
 
 .hero {
@@ -112,7 +110,7 @@ p, span, div, label {
   border: 1px solid var(--stroke);
   background: var(--panel);
   border-radius: 20px;
-  box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.08);
   animation: floatIn 0.8s ease-out;
 }
 
@@ -140,7 +138,7 @@ p, span, div, label {
   border: 1px solid var(--stroke);
   border-radius: 16px;
   padding: 16px;
-  background: rgba(7, 12, 18, 0.4);
+  background: rgba(255,255,255,0.7);
 }
 
 .card {
@@ -158,6 +156,7 @@ p, span, div, label {
   border-radius: 16px;
   padding: 18px;
   min-height: 120px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
 }
 
 .stat-label {
@@ -186,6 +185,7 @@ p, span, div, label {
   color: var(--muted);
   font-size: 12px;
   margin-right: 6px;
+  background: rgba(255,255,255,0.6);
 }
 
 .badge {
@@ -194,7 +194,7 @@ p, span, div, label {
   gap: 6px;
   padding: 6px 10px;
   border-radius: 12px;
-  background: rgba(0,0,0,0.35);
+  background: rgba(0,0,0,0.05);
   border: 1px solid var(--stroke);
   font-size: 12px;
 }
@@ -206,7 +206,7 @@ p, span, div, label {
 
 div.stButton > button {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #0b1220;
+  color: #ffffff;
   border: none;
   border-radius: 12px;
   padding: 0.6rem 1.1rem;
@@ -215,13 +215,13 @@ div.stButton > button {
 
 div[data-baseweb="input"] input,
 div[data-baseweb="textarea"] textarea {
-  background: rgba(10, 16, 24, 0.55);
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--stroke);
   color: var(--ink);
 }
 
 div[data-baseweb="select"] > div {
-  background: rgba(10, 16, 24, 0.55);
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid var(--stroke);
   color: var(--ink);
 }
@@ -288,42 +288,39 @@ def stat_card(label: str, value: str, sub: str = ""):
     )
 
 
-st.sidebar.markdown("### Deutsch Lab")
-base_url = st.sidebar.text_input("API Base URL", BASE_DEFAULT)
-user_id = st.sidebar.number_input("User ID", min_value=1, value=1, step=1)
-api_key_input = st.sidebar.text_input("API Key", type="password", value="")
-st.session_state["api_key"] = api_key_input
-nav = st.sidebar.radio(
-    "Navigation",
-    ["Dashboard", "Stats", "Manual Add", "Sentence Add", "Review", "Scenarios", "Search", "Coach", "AI Teacher", "Transfer"],
-)
-
-st.markdown(
-    f"""
-<div class="hero">
-  <div class="hero-grid">
-    <div>
-      <div class="pill">German Learning System</div>
-      <div class="pill">Supabase + FastAPI</div>
-      <div class="hero-title">Deutsch Lab</div>
-      <div class="hero-sub">Focus. Flow. Fortschritt.</div>
-      <div class="badge">API <span class="accent">{base_url}</span></div>
-    </div>
-    <div class="hero-panel">
-      <div class="badge">Active User <span class="accent">#{user_id}</span></div>
-      <div style="margin-top:10px; color: var(--muted);">Realtime study flow and insights.</div>
-    </div>
-  </div>
+# ── 사이드바 ────────────────────────────────────────────────────────────────
+st.sidebar.markdown("""
+<div style="text-align:center;padding:16px 0 8px">
+  <div style="font-size:20px;font-weight:700;color:var(--accent)">🇩🇪 Deutsch Lab</div>
+  <div style="font-size:11px;color:var(--muted)">한국인을 위한 독일어 학습</div>
 </div>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
-st.write("")
+with st.sidebar.expander("⚙️ 서버 설정", expanded=False):
+    base_url = st.text_input("API Base URL", BASE_DEFAULT, key="cfg_base_url")
+    api_key_input = st.text_input("API Key", type="password", value="", key="cfg_api_key")
+    st.session_state["api_key"] = api_key_input
 
+# expander 안에서 정의된 변수는 with 블록 밖에서도 유효하지만,
+# session_state 키로 안전하게 읽기
+base_url = st.session_state.get("cfg_base_url", BASE_DEFAULT)
+
+user_id = st.sidebar.number_input("사용자 ID", min_value=1, value=1, step=1)
+
+PAGES = {
+    "대시보드":  "Dashboard",
+    "복습":      "Review",
+    "시나리오":  "Scenarios",
+    "검색":      "Search",
+    "AI 선생님": "AI Teacher",
+}
+nav_label = st.sidebar.selectbox("메뉴", list(PAGES.keys()))
+nav = PAGES[nav_label]
+
+# ── 페이지 본문 ──────────────────────────────────────────────────────────────
 
 if nav == "Dashboard":
-    st.subheader("Daily Snapshot")
+    st.subheader("오늘의 학습 현황")
     col1, col2, col3, col4 = st.columns(4)
     try:
         review_data = api_get(
@@ -353,18 +350,18 @@ if nav == "Dashboard":
         weak_count = "-"
 
     with col1:
-        stat_card("Due Words", str(due_count), "Review queue")
+        stat_card("복습 대기 단어", str(due_count), "복습 대기 중")
     with col2:
-        stat_card("Bundle", str(bundle_count), "Recommended words")
+        stat_card("추천 단어", str(bundle_count), "오늘 추천")
     with col3:
-        stat_card("Scenarios", str(bundle_scenario_count), "Today's practice")
+        stat_card("시나리오", str(bundle_scenario_count), "오늘 연습")
     with col4:
         avg_str = f"{bundle_meta.get('avg_mastery', 0):.0%}" if bundle_meta else "-"
-        stat_card("Avg Mastery", avg_str, f"Level: {bundle_meta.get('current_level', '-')}")
+        stat_card("평균 숙달도", avg_str, f"레벨: {bundle_meta.get('current_level', '-')}")
 
     col_left, col_right = st.columns(2)
     with col_left:
-        st.subheader("Weak Grammar")
+        st.subheader("취약 문법")
         try:
             weak = api_get(base_url, "/recommend/weak-grammar", {"user_id": user_id})
             for row in weak["data"][:4]:
@@ -376,7 +373,7 @@ if nav == "Dashboard":
             st.error(str(exc))
 
     with col_right:
-        st.subheader("Weak Words")
+        st.subheader("취약 단어")
         try:
             weak_words = api_get(base_url, "/recommend/weak-words", {"user_id": user_id})
             for row in weak_words["data"][:4]:
@@ -387,136 +384,36 @@ if nav == "Dashboard":
         except Exception as exc:
             st.error(str(exc))
 
-elif nav == "Stats":
-    st.subheader("Stats & Badges")
+    st.divider()
+    st.subheader("통계")
     try:
         overview = api_get(base_url, "/stats/overview", {"user_id": user_id})["data"]
         totals = overview["totals"]
         streaks = overview["streaks"]
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            stat_card("Total Words", str(totals["words"]), "Words in DB")
-        with col2:
-            stat_card("Total Grammar", str(totals["grammar"]), "Grammar in DB")
-        with col3:
-            stat_card("Total Expressions", str(totals["expressions"]), "Expressions in DB")
-        with col4:
-            stat_card("Mastered", str(overview["mastered_words"]), "Mastered words")
-
-        st.markdown(
-            f"<div class='card'><div class='accent'>Current Streak</div>"
-            f"<div class='stat-value'>{streaks['current']} days</div></div>",
-            unsafe_allow_html=True,
-        )
+        sc1, sc2, sc3, sc4 = st.columns(4)
+        with sc1:
+            stat_card("전체 단어", str(totals["words"]), "DB 저장")
+        with sc2:
+            stat_card("전체 문법", str(totals["grammar"]), "DB 저장")
+        with sc3:
+            stat_card("마스터 단어", str(overview["mastered_words"]), "마스터 완료")
+        with sc4:
+            stat_card("연속 학습", f"{streaks['current']}일", "오늘까지")
     except Exception as exc:
         st.error(str(exc))
-
-    st.subheader("Badges")
-    try:
-        badges = api_get(base_url, "/achievements", {"user_id": user_id})["data"]["badges"]
-        for badge in badges:
-            status = "Unlocked" if badge["unlocked"] else "Locked"
-            st.markdown(
-                f"<div class='card'><div class='accent'>{badge['label']}</div>"
-                f"<div class='pill'>{status}</div><div>{badge['desc']}</div></div>",
-                unsafe_allow_html=True,
-            )
-    except Exception as exc:
-        st.error(str(exc))
-
-elif nav == "Manual Add":
-    st.subheader("Manual Add")
-    tab_word, tab_grammar, tab_expr, tab_scenario = st.tabs(
-        ["Word", "Grammar", "Expression", "Scenario"]
-    )
-
-    with tab_word:
-        lemma = st.text_input("Lemma")
-        pos = st.text_input("Part of Speech", "Nomen")
-        level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1", "C2"])
-        translation = st.text_input("Translation")
-        gender = st.text_input("Gender (der/die/das)")
-        plural = st.text_input("Plural")
-        theme = st.text_input("Theme")
-        frequency = st.text_input("Frequency", "common")
-        if st.button("Save Word"):
-            payload = {
-                "lemma": lemma,
-                "part_of_speech": pos,
-                "level": level,
-                "translation": translation or None,
-                "gender": gender or None,
-                "plural": plural or None,
-                "theme": theme or None,
-                "frequency": frequency or None,
-            }
-            st.write(api_post(base_url, "/words", payload))
-
-    with tab_grammar:
-        rule_name = st.text_input("Rule Name")
-        level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1", "C2"], key="grammar_level")
-        category = st.text_input("Category")
-        explanation = st.text_area("Explanation")
-        examples = st.text_area("Examples (one per line)")
-        if st.button("Save Grammar"):
-            payload = {
-                "rule_name": rule_name,
-                "level": level,
-                "category": category or None,
-                "explanation": explanation or None,
-                "examples": [x for x in examples.splitlines() if x.strip()] or None,
-            }
-            st.write(api_post(base_url, "/grammar", payload))
-
-    with tab_expr:
-        german = st.text_area("German")
-        korean = st.text_area("Korean")
-        level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1", "C2"], key="expr_level")
-        type_ = st.text_input("Type")
-        formality = st.selectbox("Formality", ["", "formal", "informal", "neutral"])
-        situation = st.text_input("Situation")
-        context = st.text_area("Context")
-        if st.button("Save Expression"):
-            payload = {
-                "german": german,
-                "korean": korean or None,
-                "level": level,
-                "type": type_ or None,
-                "formality": formality or None,
-                "situation": situation or None,
-                "context": context or None,
-            }
-            st.write(api_post(base_url, "/expressions", payload))
-
-    with tab_scenario:
-        name = st.text_input("Scenario Name")
-        description = st.text_area("Description")
-        level_min = st.selectbox("Min Level", ["A1", "A2", "B1", "B2", "C1", "C2"], key="level_min")
-        level_max = st.selectbox("Max Level", ["A1", "A2", "B1", "B2", "C1", "C2"], key="level_max")
-        situation = st.text_input("Situation")
-        dialogue = st.text_area("Dialogue Script (JSON)")
-        if st.button("Save Scenario"):
-            payload = {
-                "name": name,
-                "description": description or None,
-                "level_min": level_min,
-                "level_max": level_max,
-                "situation": situation or None,
-                "dialogue_script": json.loads(dialogue) if dialogue else None,
-            }
-            st.write(api_post(base_url, "/scenarios", payload))
-
-elif nav == "Sentence Add":
-    st.subheader("Sentence Analyze")
-    sentence = st.text_area("Sentence", "Ich gehe mit meinem Freund ins Kino")
-    level_hint = st.selectbox("Level Hint", ["A1", "A2", "B1", "B2", "C1", "C2"])
-    save = st.toggle("Save to DB", value=True)
-    if st.button("Analyze"):
-        payload = {"sentence": sentence, "level_hint": level_hint, "save": save}
-        st.write(api_post(base_url, "/analysis/sentence", payload))
 
 elif nav == "Review":
-    st.subheader("Review Queue")
+    st.subheader("복습 큐")
+
+    _quality_labels = {
+        0: "0 전혀 모름",
+        1: "1 어렴풋이",
+        2: "2 어려웠음",
+        3: "3 기억남",
+        4: "4 쉬웠음",
+        5: "5 완벽",
+    }
+
     try:
         queue = api_get(
             base_url,
@@ -527,19 +424,19 @@ elif nav == "Review":
             success = row.get("success_count", 0)
             fail = row.get("fail_count", 0)
             st.markdown(
-                f"<div class='card'><div class='accent'>Word ID {row['word_id']}</div>"
-                f"<div class='pill'>State {row['id']}</div>"
-                f"<div class='pill'>Next {row.get('next_review')}</div>"
+                f"<div class='card'><div class='accent'>단어 #{row['word_id']}</div>"
+                f"<div class='pill'>다음 복습 {row.get('next_review')}</div>"
                 f"<div class='pill'>✓ {success} / ✗ {fail}</div></div>",
                 unsafe_allow_html=True,
             )
-            quality = st.select_slider(
-                f"Quality for state {row['id']}",
+            quality = st.selectbox(
+                "학습 품질",
                 options=[0, 1, 2, 3, 4, 5],
-                value=4,
+                index=4,
+                format_func=lambda x: _quality_labels[x],
                 key=f"q_{row['id']}",
             )
-            if st.button(f"Update State {row['id']}", key=f"btn_{row['id']}"):
+            if st.button("복습 완료", key=f"btn_{row['id']}"):
                 st.write(
                     api_post(
                         base_url,
@@ -551,9 +448,18 @@ elif nav == "Review":
         st.error(str(exc))
 
 elif nav == "Scenarios":
-    st.subheader("Scenario Practice")
+    st.subheader("시나리오 연습")
 
-    st.write("**Today's Scenario Queue**")
+    _quality_labels = {
+        0: "0 전혀 모름",
+        1: "1 어렴풋이",
+        2: "2 어려웠음",
+        3: "3 기억남",
+        4: "4 쉬웠음",
+        5: "5 완벽",
+    }
+
+    st.write("**오늘의 시나리오**")
     try:
         bundle = api_get(base_url, "/recommend/today", {"user_id": user_id})
         today_scenarios = bundle["data"].get("scenarios", [])
@@ -563,101 +469,75 @@ elif nav == "Scenarios":
                     st.write(scenario.get("description", ""))
                     if scenario.get("dialogue_script"):
                         st.json(scenario["dialogue_script"])
-                    quality = st.select_slider(
-                        "Practice Quality",
+                    quality = st.selectbox(
+                        "학습 품질",
                         options=[0, 1, 2, 3, 4, 5],
-                        value=4,
+                        index=4,
+                        format_func=lambda x: _quality_labels[x],
                         key=f"sc_q_{scenario['id']}",
                     )
-                    if st.button("Mark as Practiced", key=f"sc_btn_{scenario['id']}"):
+                    if st.button("연습 완료", key=f"sc_btn_{scenario['id']}"):
                         result = api_post(
                             base_url,
                             f"/scenarios/{scenario['id']}/practice",
                             params={"user_id": user_id, "quality": quality},
                         )
-                        st.success(f"Recorded! Next review: {result['data'].get('next_review', '-')}")
+                        st.success(f"기록 완료! 다음 복습: {result['data'].get('next_review', '-')}")
         else:
-            st.info("No scenarios due today.")
+            st.info("오늘 예정된 시나리오가 없습니다.")
     except Exception as exc:
         st.error(str(exc))
 
     st.divider()
-    st.write("**All Scenarios**")
+    st.write("**전체 시나리오**")
     try:
         all_scenarios = api_get(base_url, "/scenarios", {"limit": 50})["data"]
         for scenario in all_scenarios:
             with st.expander(f"{scenario['name']} [{scenario.get('situation', '-')}]"):
                 st.write(scenario.get("description", ""))
-                quality = st.select_slider(
-                    "Practice Quality",
+                quality = st.selectbox(
+                    "학습 품질",
                     options=[0, 1, 2, 3, 4, 5],
-                    value=4,
+                    index=4,
+                    format_func=lambda x: _quality_labels[x],
                     key=f"all_sc_q_{scenario['id']}",
                 )
-                if st.button("Practice", key=f"all_sc_btn_{scenario['id']}"):
+                if st.button("연습하기", key=f"all_sc_btn_{scenario['id']}"):
                     result = api_post(
                         base_url,
                         f"/scenarios/{scenario['id']}/practice",
                         params={"user_id": user_id, "quality": quality},
                     )
-                    st.success(f"Recorded! Next review: {result['data'].get('next_review', '-')}")
+                    st.success(f"기록 완료! 다음 복습: {result['data'].get('next_review', '-')}")
     except Exception as exc:
         st.error(str(exc))
 
 elif nav == "Search":
-    st.subheader("Vector Search")
+    st.subheader("벡터 검색")
+
+    _search_type_labels = {
+        "words": "단어",
+        "grammar": "문법",
+        "expressions": "표현",
+        "scenarios": "시나리오",
+    }
     search_type = st.selectbox(
-        "Type", ["words", "grammar", "expressions", "scenarios"]
+        "검색 대상",
+        ["words", "grammar", "expressions", "scenarios"],
+        format_func=lambda x: _search_type_labels[x],
     )
-    search_query = st.text_input("Search Query", "")
-    limit = st.slider("Limit", min_value=1, max_value=50, value=10)
-    if st.button("Search"):
+    search_query = st.text_input("검색어", "")
+    limit = st.slider("결과 수", min_value=1, max_value=50, value=10)
+    if st.button("검색하기"):
         try:
             st.write(api_get(base_url, f"/search/{search_type}", {"q": search_query, "limit": limit}))
         except Exception as exc:
             st.error(str(exc))
 
-    st.subheader("Theme Bundle")
-    theme = st.text_input("Theme/Situation", "food")
-    if st.button("Get Theme Bundle"):
+    st.subheader("테마 묶음")
+    theme = st.text_input("테마 / 상황", "food")
+    if st.button("테마 묶음 조회"):
         st.write(api_get(base_url, "/recommend/theme", {"theme": theme}))
-
-elif nav == "Coach":
-    st.subheader("LLM Coach")
-    tab_feedback, tab_roleplay = st.tabs(["Feedback", "Roleplay"])
-
-    with tab_feedback:
-        text = st.text_area("Learner Sentence", "Ich gehe mit meinem Freund ins Kino")
-        level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1", "C2"], key="fb_level")
-        focus = st.text_input("Focus", "grammar/word-order")
-        known = st.text_input("Known Words (comma)")
-        known_words = [w.strip() for w in known.split(",") if w.strip()]
-        if st.button("Get Feedback"):
-            payload = {
-                "text": text,
-                "level": level,
-                "focus": focus or None,
-                "known_words": known_words or None,
-            }
-            st.write(api_post(base_url, "/coach/feedback", payload))
-
-    with tab_roleplay:
-        scenario = st.text_input("Scenario", "restaurant order")
-        level = st.selectbox("Level", ["A1", "A2", "B1", "B2", "C1", "C2"], key="rp_level")
-        user_input = st.text_area("Your Reply")
-        formality = st.selectbox("Formality", ["", "formal", "informal", "neutral"], key="rp_form")
-        known = st.text_input("Known Words (comma, 비워두면 DB 자동 조회)", key="rp_known")
-        known_words = [w.strip() for w in known.split(",") if w.strip()]
-        if st.button("Start Roleplay"):
-            payload = {
-                "scenario": scenario,
-                "level": level,
-                "user_input": user_input or None,
-                "formality": formality or None,
-                "known_words": known_words or None,
-                "user_id": user_id,
-            }
-            st.write(api_post(base_url, "/coach/roleplay", payload))
 
 elif nav == "AI Teacher":
     st.subheader("AI 선생님")
@@ -692,25 +572,99 @@ elif nav == "AI Teacher":
                 st.error(result.get("detail", "오류가 발생했습니다."))
 
     with tab_sentences:
-        st.markdown("#### 문법 중심 문장 생성")
+        st.markdown("#### 문장 중심 학습")
         sent_count = st.slider("생성할 문장 수", 1, 10, 5, key="ts_count")
+
+        if "ts_sentences" not in st.session_state:
+            st.session_state["ts_sentences"] = []
+
         if st.button("문장 생성하기", key="ts_btn"):
             payload = {"user_id": user_id, "count": sent_count}
             result = api_post(base_url, "/teacher/generate-sentences", payload)
             if result.get("status") == "ok":
-                sentences = result.get("data", {}).get("sentences", [])
+                st.session_state["ts_sentences"] = result.get("data", {}).get("sentences", [])
                 meta = result.get("data", {}).get("meta", {})
                 if meta.get("weak_grammar_targets"):
                     st.caption("집중 문법: " + ", ".join(meta["weak_grammar_targets"]))
-                for i, s in enumerate(sentences, 1):
-                    with st.expander(f"{i}. {s['german']}", expanded=False):
-                        st.markdown(f"**한국어**: {s['korean']}")
-                        st.markdown(f"**문법 포인트**: `{s['grammar_focus']}`")
-                        if s.get("blanked"):
-                            st.markdown(f"**빈칸 연습**: {s['blanked']}")
-                            st.markdown(f"**힌트**: {s['hint']}")
             else:
                 st.error(result.get("detail", "오류가 발생했습니다."))
+
+        for i, s in enumerate(st.session_state.get("ts_sentences", [])):
+            st.markdown("---")
+            # 문장 + 번역
+            st.markdown(
+                f'<div style="font-size:1.15rem;font-weight:600;color:var(--accent)">{s["german"]}</div>'
+                f'<div style="color:var(--muted);margin-bottom:6px">{s["korean"]}</div>',
+                unsafe_allow_html=True,
+            )
+            st.caption(f"문법 포인트: {s['grammar_focus']}")
+            if s.get("blanked"):
+                st.markdown(f"**빈칸 연습**: {s['blanked']}  ·  **힌트**: {s['hint']}")
+
+            # 동사 변화표
+            verbs = s.get("verbs", [])
+            if verbs:
+                st.markdown("**동사 변화표 (현재형)**")
+                for verb in verbs:
+                    p = verb.get("present", {})
+                    table_html = f"""
+<table style="border-collapse:collapse;font-size:0.85rem;margin-bottom:6px">
+  <tr>
+    <td style="padding:2px 10px;color:var(--muted)">ich</td>
+    <td style="padding:2px 14px;font-weight:600">{p.get('ich','')}</td>
+    <td style="padding:2px 10px;color:var(--muted)">wir</td>
+    <td style="padding:2px 14px;font-weight:600">{p.get('wir','')}</td>
+  </tr>
+  <tr>
+    <td style="padding:2px 10px;color:var(--muted)">du</td>
+    <td style="padding:2px 14px;font-weight:600">{p.get('du','')}</td>
+    <td style="padding:2px 10px;color:var(--muted)">ihr</td>
+    <td style="padding:2px 14px;font-weight:600">{p.get('ihr','')}</td>
+  </tr>
+  <tr>
+    <td style="padding:2px 10px;color:var(--muted)">er/sie/es</td>
+    <td style="padding:2px 14px;font-weight:600">{p.get('er/sie/es','')}</td>
+    <td style="padding:2px 10px;color:var(--muted)">sie/Sie</td>
+    <td style="padding:2px 14px;font-weight:600">{p.get('sie/Sie','')}</td>
+  </tr>
+</table>"""
+                    st.markdown(f"*{verb['lemma']}*" + table_html, unsafe_allow_html=True)
+
+            # 단어 복습 표시 멀티셀렉트
+            words = s.get("words", [])
+            if words:
+                word_options = []
+                word_id_map = {}
+                for w in words:
+                    label_parts = [w["german"]]
+                    if w.get("gender"):
+                        label_parts.append(f"({w['gender']})")
+                    label_parts.append(f"— {w['translation']}")
+                    if w.get("is_new"):
+                        label_parts.append("🆕")
+                    label = " ".join(label_parts)
+                    word_options.append(label)
+                    word_id_map[label] = w.get("word_id")
+
+                selected = st.multiselect(
+                    "복습할 단어 선택",
+                    options=word_options,
+                    key=f"ts_sel_{i}",
+                )
+                if st.button("단어 표시하기", key=f"ts_mark_{i}"):
+                    success_count = 0
+                    for label in selected:
+                        wid = word_id_map.get(label)
+                        if wid is None:
+                            continue
+                        mark_result = api_post(base_url, "/user-state/words/mark",
+                                               {"user_id": user_id, "word_id": wid})
+                        if mark_result.get("status") == "ok":
+                            success_count += 1
+                    if success_count:
+                        st.success(f"✓ {success_count}개 단어가 다음 학습에 포함됩니다.")
+                    elif selected:
+                        st.warning("표시 중 오류가 발생했습니다.")
 
     with tab_chat:
         st.markdown("#### AI 선생님과 대화")
@@ -721,7 +675,6 @@ elif nav == "AI Teacher":
                             format_func=lambda x: {"free": "자유 대화", "correction": "문법 교정", "vocab_drill": "단어 위주"}[x],
                             key="tc_mode")
 
-        # 대화 히스토리 출력
         for msg in st.session_state["teacher_chat_history"]:
             role_label = "나" if msg["role"] == "user" else "선생님"
             align = "right" if msg["role"] == "user" else "left"
@@ -766,22 +719,3 @@ elif nav == "AI Teacher":
             else:
                 st.error(result.get("detail", "오류가 발생했습니다."))
 
-elif nav == "Transfer":
-    st.subheader("Export / Import")
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        if st.button("Export JSON"):
-            export_data = api_get(base_url, "/transfer/export", {"user_id": user_id})
-            st.json(export_data["data"])
-    with col2:
-        import_text = st.text_area("Import JSON", height=240)
-        if st.button("Import JSON"):
-            try:
-                payload = json.loads(import_text)
-                if "data" not in payload:
-                    payload = {"user_id": user_id, "data": payload}
-                if "user_id" not in payload:
-                    payload["user_id"] = user_id
-                st.write(api_post(base_url, "/transfer/import", payload))
-            except Exception as exc:
-                st.error(str(exc))
