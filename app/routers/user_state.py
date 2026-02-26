@@ -65,8 +65,10 @@ def mark_word_for_review(
     user_id: int = Body(...),
     word_id: int = Body(...),
 ):
-    """단어 복습 표시 (이미 상태가 있으면 무시, 없으면 mastery_score=0.0으로 생성)"""
+    """단어 복습 표시 — 기존 상태도 next_review=today로 갱신해 review_due_lemmas에 포함"""
+    from datetime import date
     supabase = get_supabase_client()
+    today = date.today().isoformat()
     existing = (
         supabase.table("user_word_state")
         .select("id")
@@ -76,11 +78,16 @@ def mark_word_for_review(
         .execute()
     )
     if existing.data:
+        supabase.table("user_word_state") \
+            .update({"next_review": today}) \
+            .eq("id", existing.data[0]["id"]) \
+            .execute()
         return {"status": "ok", "data": existing.data[0], "created": False}
     result = supabase.table("user_word_state").insert({
         "user_id": user_id,
         "word_id": word_id,
         "mastery_score": 0.0,
+        "next_review": today,
     }).execute()
     if not result.data:
         raise HTTPException(status_code=400, detail="Failed to mark word")

@@ -1,5 +1,6 @@
 import requests
 import streamlit as st
+from st_click_detector import click_detector
 
 
 st.set_page_config(page_title="Deutsch Lab", layout="wide")
@@ -87,6 +88,7 @@ p, span, div, label {
   border-radius: 999px;
   opacity: 0.4;
   z-index: 1;
+  pointer-events: none;
 }
 
 .orb-1 {
@@ -205,12 +207,18 @@ p, span, div, label {
 }
 
 div.stButton > button {
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #ffffff;
-  border: none;
-  border-radius: 12px;
-  padding: 0.6rem 1.1rem;
-  font-weight: 700;
+  background: rgba(255,255,255,0.85);
+  color: var(--ink);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+div.stButton > button:hover {
+  background: rgba(255,255,255,1);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 div[data-baseweb="input"] input,
@@ -234,6 +242,31 @@ div[data-baseweb="select"] > div {
 @keyframes floatIn {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.dialogue-wrap { display:flex; flex-direction:column; gap:10px; padding:10px 0; }
+.turn { display:flex; flex-direction:column; max-width:72%; }
+.turn-left { align-self:flex-start; }
+.turn-right { align-self:flex-end; align-items:flex-end; }
+.turn-role { font-size:11px; color:var(--muted); margin-bottom:3px; text-transform:capitalize; }
+.bubble {
+  padding:10px 14px; border-radius:16px; font-size:0.9rem; line-height:1.5;
+  box-shadow:0 2px 6px rgba(0,0,0,0.07);
+}
+.bubble-left  { background:rgba(255,255,255,0.9); border:1px solid var(--stroke); border-top-left-radius:4px; }
+.bubble-right { background:#e8eef8; border:1px solid #c8d4e8; border-top-right-radius:4px; }
+.bubble-de { font-weight:600; }
+.bubble-ko { font-size:0.8rem; margin-top:4px; color:var(--muted); }
+
+/* 단어 칩: 작고 인라인 느낌 */
+div[data-testid="stHorizontalBlock"] div.stButton button {
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  min-height: unset;
+  height: auto;
+  line-height: 1.6;
 }
 </style>
 """,
@@ -288,38 +321,75 @@ def stat_card(label: str, value: str, sub: str = ""):
     )
 
 
-# ── 사이드바 ────────────────────────────────────────────────────────────────
-st.sidebar.markdown("""
-<div style="text-align:center;padding:16px 0 8px">
-  <div style="font-size:20px;font-weight:700;color:var(--accent)">🇩🇪 Deutsch Lab</div>
-  <div style="font-size:11px;color:var(--muted)">한국인을 위한 독일어 학습</div>
-</div>
-""", unsafe_allow_html=True)
+def _build_clickable_html(german: str, words: list, marked_ids: set) -> str:
+    import re
+    result = german
+    for w in sorted(words, key=lambda x: len(x.get("german", "")), reverse=True):
+        wid = w.get("word_id")
+        if wid is None:
+            continue
+        token = re.escape(w["german"])
+        if wid in marked_ids:
+            style = "font-weight:700;text-decoration:underline;color:#c98a00;cursor:pointer"
+        else:
+            style = "border-bottom:1.5px dashed #999;cursor:pointer;text-decoration:none;color:inherit"
+        link = f'<a href="#" id="{wid}" style="{style}">{w["german"]}</a>'
+        result = re.sub(rf'\b{token}\b', link, result)
+    return f'<span style="font-size:1.1rem;font-weight:600;line-height:2">{result}</span>'
 
-with st.sidebar.expander("⚙️ 서버 설정", expanded=False):
-    base_url = st.text_input("API Base URL", BASE_DEFAULT, key="cfg_base_url")
-    api_key_input = st.text_input("API Key", type="password", value="", key="cfg_api_key")
-    st.session_state["api_key"] = api_key_input
 
-# expander 안에서 정의된 변수는 with 블록 밖에서도 유효하지만,
-# session_state 키로 안전하게 읽기
+_USER_ROLES = {"customer", "tourist", "patient", "caller", "you"}
+
+def render_dialogue(script: dict):
+    turns = script.get("turns", [])
+    if not turns:
+        st.caption("대화 내용 없음")
+        return
+    parts = ['<div class="dialogue-wrap">']
+    for turn in turns:
+        role = turn.get("role", "")
+        text = turn.get("text", "")
+        translation = turn.get("translation", "")
+        is_user = role.lower() in _USER_ROLES
+        side = "right" if is_user else "left"
+        parts.append(
+            f'<div class="turn turn-{side}">'
+            f'  <div class="turn-role">{role}</div>'
+            f'  <div class="bubble bubble-{side}">'
+            f'    <div class="bubble-de">{text}</div>'
+            f'    <div class="bubble-ko">{translation}</div>'
+            f'  </div>'
+            f'</div>'
+        )
+    parts.append("</div>")
+    st.markdown("".join(parts), unsafe_allow_html=True)
+
+
+# ── 헤더 + 설정 ───────────────────────────────────────────────────────────────
+st.markdown(
+    '<div style="font-size:22px;font-weight:700;color:var(--accent);margin-bottom:4px">🇩🇪 Deutsch Lab</div>'
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">한국인을 위한 독일어 학습</div>',
+    unsafe_allow_html=True,
+)
+with st.expander("⚙️ 설정", expanded=False):
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        st.number_input("사용자 ID", min_value=1, value=1, step=1, key="user_id")
+    with col_b:
+        st.text_input("API Base URL", BASE_DEFAULT, key="cfg_base_url")
+    with col_c:
+        _key_val = st.text_input("API Key", type="password", value="", key="cfg_api_key")
+        st.session_state["api_key"] = _key_val
+
+user_id = st.session_state.get("user_id", 1)
 base_url = st.session_state.get("cfg_base_url", BASE_DEFAULT)
 
-user_id = st.sidebar.number_input("사용자 ID", min_value=1, value=1, step=1)
+# ── 상단 탭 ──────────────────────────────────────────────────────────────────
+tab_dash, tab_scenario, tab_search, tab_teacher = st.tabs(
+    ["대시보드", "시나리오", "검색", "AI 선생님"]
+)
 
-PAGES = {
-    "대시보드":  "Dashboard",
-    "복습":      "Review",
-    "시나리오":  "Scenarios",
-    "검색":      "Search",
-    "AI 선생님": "AI Teacher",
-}
-nav_label = st.sidebar.selectbox("메뉴", list(PAGES.keys()))
-nav = PAGES[nav_label]
-
-# ── 페이지 본문 ──────────────────────────────────────────────────────────────
-
-if nav == "Dashboard":
+with tab_dash:
     st.subheader("오늘의 학습 현황")
     col1, col2, col3, col4 = st.columns(4)
     try:
@@ -402,52 +472,7 @@ if nav == "Dashboard":
     except Exception as exc:
         st.error(str(exc))
 
-elif nav == "Review":
-    st.subheader("복습 큐")
-
-    _quality_labels = {
-        0: "0 전혀 모름",
-        1: "1 어렴풋이",
-        2: "2 어려웠음",
-        3: "3 기억남",
-        4: "4 쉬웠음",
-        5: "5 완벽",
-    }
-
-    try:
-        queue = api_get(
-            base_url,
-            "/study/review-today",
-            {"user_id": user_id, "item_type": "word"},
-        )["data"]
-        for row in queue:
-            success = row.get("success_count", 0)
-            fail = row.get("fail_count", 0)
-            st.markdown(
-                f"<div class='card'><div class='accent'>단어 #{row['word_id']}</div>"
-                f"<div class='pill'>다음 복습 {row.get('next_review')}</div>"
-                f"<div class='pill'>✓ {success} / ✗ {fail}</div></div>",
-                unsafe_allow_html=True,
-            )
-            quality = st.selectbox(
-                "학습 품질",
-                options=[0, 1, 2, 3, 4, 5],
-                index=4,
-                format_func=lambda x: _quality_labels[x],
-                key=f"q_{row['id']}",
-            )
-            if st.button("복습 완료", key=f"btn_{row['id']}"):
-                st.write(
-                    api_post(
-                        base_url,
-                        "/study/review-word",
-                        params={"state_id": row["id"], "quality": quality},
-                    )
-                )
-    except Exception as exc:
-        st.error(str(exc))
-
-elif nav == "Scenarios":
+with tab_scenario:
     st.subheader("시나리오 연습")
 
     _quality_labels = {
@@ -459,6 +484,33 @@ elif nav == "Scenarios":
         5: "5 완벽",
     }
 
+    def _render_scenario_card(scenario: dict, btn_key: str, q_key: str):
+        st.markdown(
+            f'<div style="color:var(--muted);font-size:0.85rem;margin-bottom:6px">'
+            f'{scenario.get("description","")}&nbsp;&nbsp;'
+            f'<span class="pill">{scenario.get("situation","-")}</span>'
+            f'<span class="pill">{scenario.get("level_min","")}–{scenario.get("level_max","")}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        if scenario.get("dialogue_script"):
+            render_dialogue(scenario["dialogue_script"])
+        quality = st.selectbox(
+            "학습 품질",
+            options=[0, 1, 2, 3, 4, 5],
+            index=4,
+            format_func=lambda x: _quality_labels[x],
+            key=q_key,
+        )
+        if st.button("연습 완료", key=btn_key):
+            result = api_post(
+                base_url,
+                f"/scenarios/{scenario['id']}/practice",
+                params={"user_id": user_id, "quality": quality},
+            )
+            next_review = (result.get('data') or {}).get('next_review', '-')
+            st.success(f"기록 완료! 다음 복습: {next_review}")
+
     st.write("**오늘의 시나리오**")
     try:
         bundle = api_get(base_url, "/recommend/today", {"user_id": user_id})
@@ -466,23 +518,7 @@ elif nav == "Scenarios":
         if today_scenarios:
             for scenario in today_scenarios:
                 with st.expander(f"{scenario['name']} [{scenario.get('level_min','')}-{scenario.get('level_max','')}]"):
-                    st.write(scenario.get("description", ""))
-                    if scenario.get("dialogue_script"):
-                        st.json(scenario["dialogue_script"])
-                    quality = st.selectbox(
-                        "학습 품질",
-                        options=[0, 1, 2, 3, 4, 5],
-                        index=4,
-                        format_func=lambda x: _quality_labels[x],
-                        key=f"sc_q_{scenario['id']}",
-                    )
-                    if st.button("연습 완료", key=f"sc_btn_{scenario['id']}"):
-                        result = api_post(
-                            base_url,
-                            f"/scenarios/{scenario['id']}/practice",
-                            params={"user_id": user_id, "quality": quality},
-                        )
-                        st.success(f"기록 완료! 다음 복습: {result['data'].get('next_review', '-')}")
+                    _render_scenario_card(scenario, f"sc_btn_{scenario['id']}", f"sc_q_{scenario['id']}")
         else:
             st.info("오늘 예정된 시나리오가 없습니다.")
     except Exception as exc:
@@ -494,25 +530,11 @@ elif nav == "Scenarios":
         all_scenarios = api_get(base_url, "/scenarios", {"limit": 50})["data"]
         for scenario in all_scenarios:
             with st.expander(f"{scenario['name']} [{scenario.get('situation', '-')}]"):
-                st.write(scenario.get("description", ""))
-                quality = st.selectbox(
-                    "학습 품질",
-                    options=[0, 1, 2, 3, 4, 5],
-                    index=4,
-                    format_func=lambda x: _quality_labels[x],
-                    key=f"all_sc_q_{scenario['id']}",
-                )
-                if st.button("연습하기", key=f"all_sc_btn_{scenario['id']}"):
-                    result = api_post(
-                        base_url,
-                        f"/scenarios/{scenario['id']}/practice",
-                        params={"user_id": user_id, "quality": quality},
-                    )
-                    st.success(f"기록 완료! 다음 복습: {result['data'].get('next_review', '-')}")
+                _render_scenario_card(scenario, f"all_sc_btn_{scenario['id']}", f"all_sc_q_{scenario['id']}")
     except Exception as exc:
         st.error(str(exc))
 
-elif nav == "Search":
+with tab_search:
     st.subheader("벡터 검색")
 
     _search_type_labels = {
@@ -539,75 +561,64 @@ elif nav == "Search":
     if st.button("테마 묶음 조회"):
         st.write(api_get(base_url, "/recommend/theme", {"theme": theme}))
 
-elif nav == "AI Teacher":
+with tab_teacher:
     st.subheader("AI 선생님")
-    tab_words, tab_sentences, tab_chat = st.tabs(["단어 생성", "문장 연습", "AI 대화"])
+    st.markdown("#### 문장 중심 학습")
+    sent_count = st.slider("생성할 문장 수", 1, 10, 5, key="ts_count")
 
-    with tab_words:
-        st.markdown("#### 맞춤 단어 생성")
-        word_count = st.slider("생성할 단어 수", 1, 10, 5, key="tw_count")
-        theme_input = st.text_input("테마 (선택 사항)", placeholder="예: 음식, 여행, 직장 등", key="tw_theme")
-        if st.button("단어 생성하기", key="tw_btn"):
-            payload = {"user_id": user_id, "count": word_count, "theme": theme_input or None}
-            result = api_post(base_url, "/teacher/generate-words", payload)
-            if result.get("status") == "ok":
-                words = result.get("data", {}).get("words", [])
-                meta = result.get("data", {}).get("meta", {})
-                if meta:
-                    st.caption(f"레벨 범위: {meta.get('level_range', '')} / 테마: {meta.get('theme_used') or '없음'}")
-                for w in words:
-                    gender_str = f" ({w.get('gender', '')})" if w.get("gender") else ""
-                    plural_str = f", Pl: {w['plural']}" if w.get("plural") else ""
-                    st.markdown(
-                        f"""<div style="background:var(--panel-strong);border-radius:10px;padding:14px 18px;margin-bottom:10px">
-<span style="font-size:1.2rem;font-weight:700;color:var(--accent)">{w['german']}</span>{gender_str}
-<span style="color:var(--muted);font-size:0.85rem"> {w.get('part_of_speech','')} {plural_str} · {w.get('level','')}</span><br>
-<span style="font-size:1rem">{w['translation']}</span><br>
-<span style="color:var(--accent-2);font-size:0.9rem"><em>{w['example_sentence']}</em></span><br>
-<span style="color:var(--muted);font-size:0.85rem">{w['example_translation']}</span>
-</div>""",
-                        unsafe_allow_html=True,
-                    )
-            else:
-                st.error(result.get("detail", "오류가 발생했습니다."))
+    if "ts_sentences" not in st.session_state:
+        st.session_state["ts_sentences"] = []
 
-    with tab_sentences:
-        st.markdown("#### 문장 중심 학습")
-        sent_count = st.slider("생성할 문장 수", 1, 10, 5, key="ts_count")
+    if st.button("문장 생성하기", key="ts_btn"):
+        payload = {"user_id": user_id, "count": sent_count}
+        result = api_post(base_url, "/teacher/generate-sentences", payload)
+        if result.get("status") == "ok":
+            st.session_state["ts_sentences"] = result.get("data", {}).get("sentences", [])
+            meta = result.get("data", {}).get("meta", {})
+            if meta.get("weak_grammar_targets"):
+                st.caption("집중 문법: " + ", ".join(meta["weak_grammar_targets"]))
+        else:
+            st.error(result.get("detail", "오류가 발생했습니다."))
 
-        if "ts_sentences" not in st.session_state:
-            st.session_state["ts_sentences"] = []
+    for i, s in enumerate(st.session_state.get("ts_sentences", [])):
+        st.markdown("---")
 
-        if st.button("문장 생성하기", key="ts_btn"):
-            payload = {"user_id": user_id, "count": sent_count}
-            result = api_post(base_url, "/teacher/generate-sentences", payload)
-            if result.get("status") == "ok":
-                st.session_state["ts_sentences"] = result.get("data", {}).get("sentences", [])
-                meta = result.get("data", {}).get("meta", {})
-                if meta.get("weak_grammar_targets"):
-                    st.caption("집중 문법: " + ", ".join(meta["weak_grammar_targets"]))
-            else:
-                st.error(result.get("detail", "오류가 발생했습니다."))
+        # marked_ids 먼저 초기화 (하이라이트에 필요)
+        words = s.get("words", [])
+        marked_key = f"ts_marked_{i}"
+        if marked_key not in st.session_state:
+            st.session_state[marked_key] = set()
+        marked_ids = st.session_state[marked_key]
 
-        for i, s in enumerate(st.session_state.get("ts_sentences", [])):
-            st.markdown("---")
-            # 문장 + 번역
-            st.markdown(
-                f'<div style="font-size:1.15rem;font-weight:600;color:var(--accent)">{s["german"]}</div>'
-                f'<div style="color:var(--muted);margin-bottom:6px">{s["korean"]}</div>',
-                unsafe_allow_html=True,
-            )
-            st.caption(f"문법 포인트: {s['grammar_focus']}")
-            if s.get("blanked"):
-                st.markdown(f"**빈칸 연습**: {s['blanked']}  ·  **힌트**: {s['hint']}")
+        # 문장 — 단어 클릭 가능 (클릭 시 마킹 + 하이라이트)
+        sentence_html = _build_clickable_html(s["german"], words, marked_ids)
+        clicked = click_detector(sentence_html, key=f"ts_click_{i}")
+        if clicked:
+            try:
+                wid = int(clicked)
+                if wid not in marked_ids:
+                    api_post(base_url, "/user-state/words/mark",
+                             {"user_id": user_id, "word_id": wid})
+                    marked_ids.add(wid)
+                    st.rerun()
+            except (ValueError, Exception):
+                pass
 
-            # 동사 변화표
-            verbs = s.get("verbs", [])
-            if verbs:
-                st.markdown("**동사 변화표 (현재형)**")
-                for verb in verbs:
-                    p = verb.get("present", {})
-                    table_html = f"""
+        st.markdown(
+            f'<div style="color:var(--muted);margin-bottom:4px">{s["korean"]}</div>',
+            unsafe_allow_html=True,
+        )
+        st.caption(f"문법 포인트: {s['grammar_focus']}")
+        if s.get("blanked"):
+            st.markdown(f"**빈칸 연습**: {s['blanked']}  ·  **힌트**: {s['hint']}")
+
+        # 동사 변화표
+        verbs = s.get("verbs", [])
+        if verbs:
+            st.markdown("**동사 변화표 (현재형)**")
+            for verb in verbs:
+                p = verb.get("present", {})
+                table_html = f"""
 <table style="border-collapse:collapse;font-size:0.85rem;margin-bottom:6px">
   <tr>
     <td style="padding:2px 10px;color:var(--muted)">ich</td>
@@ -628,94 +639,23 @@ elif nav == "AI Teacher":
     <td style="padding:2px 14px;font-weight:600">{p.get('sie/Sie','')}</td>
   </tr>
 </table>"""
-                    st.markdown(f"*{verb['lemma']}*" + table_html, unsafe_allow_html=True)
+                st.markdown(f"*{verb['lemma']}*" + table_html, unsafe_allow_html=True)
 
-            # 단어 복습 표시 멀티셀렉트
-            words = s.get("words", [])
-            if words:
-                word_options = []
-                word_id_map = {}
-                for w in words:
-                    label_parts = [w["german"]]
-                    if w.get("gender"):
-                        label_parts.append(f"({w['gender']})")
-                    label_parts.append(f"— {w['translation']}")
-                    if w.get("is_new"):
-                        label_parts.append("🆕")
-                    label = " ".join(label_parts)
-                    word_options.append(label)
-                    word_id_map[label] = w.get("word_id")
-
-                selected = st.multiselect(
-                    "복습할 단어 선택",
-                    options=word_options,
-                    key=f"ts_sel_{i}",
+        # 단어 참고 목록 (비인터랙티브 pill)
+        if words:
+            pills = []
+            for w in words:
+                label = f'{"🆕 " if w.get("is_new") else ""}{w["german"]}'
+                if w.get("gender"):
+                    label += f' ({w["gender"]})'
+                label += f' — {w["translation"]}'
+                bg = "rgba(201,138,0,0.12)" if w.get("word_id") in marked_ids else "rgba(0,0,0,0.05)"
+                pills.append(
+                    f'<span style="display:inline-block;padding:2px 10px;border-radius:999px;'
+                    f'background:{bg};font-size:0.75rem;margin:2px 3px">{label}</span>'
                 )
-                if st.button("단어 표시하기", key=f"ts_mark_{i}"):
-                    success_count = 0
-                    for label in selected:
-                        wid = word_id_map.get(label)
-                        if wid is None:
-                            continue
-                        mark_result = api_post(base_url, "/user-state/words/mark",
-                                               {"user_id": user_id, "word_id": wid})
-                        if mark_result.get("status") == "ok":
-                            success_count += 1
-                    if success_count:
-                        st.success(f"✓ {success_count}개 단어가 다음 학습에 포함됩니다.")
-                    elif selected:
-                        st.warning("표시 중 오류가 발생했습니다.")
-
-    with tab_chat:
-        st.markdown("#### AI 선생님과 대화")
-        if "teacher_chat_history" not in st.session_state:
-            st.session_state["teacher_chat_history"] = []
-
-        mode = st.selectbox("대화 모드", ["free", "correction", "vocab_drill"],
-                            format_func=lambda x: {"free": "자유 대화", "correction": "문법 교정", "vocab_drill": "단어 위주"}[x],
-                            key="tc_mode")
-
-        for msg in st.session_state["teacher_chat_history"]:
-            role_label = "나" if msg["role"] == "user" else "선생님"
-            align = "right" if msg["role"] == "user" else "left"
-            bg = "var(--bg-2)" if msg["role"] == "user" else "var(--panel-strong)"
             st.markdown(
-                f'<div style="text-align:{align};margin:4px 0"><span style="background:{bg};'
-                f'border-radius:8px;padding:8px 14px;display:inline-block;max-width:80%">'
-                f'<b>{role_label}</b>: {msg["content"]}</span></div>',
+                f'<div style="margin-top:4px">{"".join(pills)}</div>',
                 unsafe_allow_html=True,
             )
-
-        user_msg = st.text_input("메시지 입력", key="tc_input", placeholder="독일어 또는 한국어로 입력하세요")
-        col_send, col_clear = st.columns([1, 5])
-        with col_send:
-            send_btn = st.button("전송", key="tc_send")
-        with col_clear:
-            if st.button("대화 초기화", key="tc_clear"):
-                st.session_state["teacher_chat_history"] = []
-                st.rerun()
-
-        if send_btn and user_msg.strip():
-            history_payload = [{"role": m["role"], "content": m["content"]}
-                               for m in st.session_state["teacher_chat_history"]]
-            payload = {
-                "user_id": user_id,
-                "message": user_msg,
-                "history": history_payload,
-                "mode": mode,
-            }
-            result = api_post(base_url, "/teacher/chat", payload)
-            if result.get("status") == "ok":
-                data = result["data"]
-                st.session_state["teacher_chat_history"].append({"role": "user", "content": user_msg})
-                st.session_state["teacher_chat_history"].append({"role": "assistant", "content": data["reply"]})
-                if data.get("correction"):
-                    st.info(f"교정: {data['correction']}")
-                if data.get("new_words"):
-                    st.caption("새 단어: " + ", ".join(data["new_words"]))
-                if data.get("tip"):
-                    st.caption(f"팁: {data['tip']}")
-                st.rerun()
-            else:
-                st.error(result.get("detail", "오류가 발생했습니다."))
 
