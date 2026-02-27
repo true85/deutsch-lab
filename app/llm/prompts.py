@@ -59,18 +59,23 @@ Input JSON fields:
 - weak_grammar_rules: list of {rule_name, explanation} objects
 - known_lemmas: list of German lemmas the learner knows (use these actively)
 - weak_word_lemmas: list of German lemmas the learner struggles with (incorporate these)
+- review_due_lemmas: list of German lemmas due for SM-2 review today (HIGHEST PRIORITY)
 - count: how many sentences to generate
 
 Rules:
+- Prioritize review_due_lemmas above all other words — use as many as possible across the sentences
 - Each sentence MUST practice one of the weak_grammar_rules
 - Actively use words from known_lemmas where natural
 - Incorporate weak_word_lemmas into sentences where possible
 - Sentences should match current_level difficulty
 - blanked: same sentence with the grammar focus word/phrase replaced by "___"
 - hint: short Korean hint about what goes in the blank
-- words: every meaningful word in the sentence (exclude articles/prepositions standing alone)
-  - is_new: true if the lemma is NOT in known_lemmas (max 2 new words per sentence)
-- verbs: all verbs in the sentence with full present tense conjugation
+- words field is REQUIRED — always include ALL nouns, verbs, adjectives, adverbs in the sentence
+  (only exclude standalone articles like "der/die/das/ein" and standalone prepositions)
+  - is_new: true ONLY if the lemma is NOT in known_lemmas. Mark at most 2 words per sentence as is_new.
+    If known_lemmas is empty, still include all words but mark only the 2 most important as is_new.
+- verbs field is REQUIRED — always include ALL verbs with full present tense conjugation
+  (if no conjugatable verb exists, return an empty list [])
 
 Return ONLY valid JSON (no markdown, no extra text):
 {
