@@ -1,5 +1,6 @@
 import json
-from datetime import date
+import random
+from datetime import date, datetime
 
 from fastapi import APIRouter, HTTPException
 
@@ -8,11 +9,12 @@ from app.llm.prompts import (
     SYSTEM_BASE,
     TEACHER_CHAT_PROMPT,
     TEACHER_CHAT_SYSTEM_PROMPT,
+    TEACHER_GENERATE_SCENARIO_PROMPT,
     TEACHER_GENERATE_SENTENCES_PROMPT,
     TEACHER_GENERATE_WORDS_PROMPT,
 )
 from app.routers.recommend import _get_user_avg_mastery, _get_user_current_level
-from app.schemas.teacher import ChatRequest, GenerateSentencesRequest, GenerateWordsRequest
+from app.schemas.teacher import ChatRequest, GenerateScenarioRequest, GenerateSentencesRequest, GenerateWordsRequest
 from app.supabase_client import get_supabase_client
 
 router = APIRouter(prefix="/teacher", tags=["teacher"])
@@ -36,13 +38,14 @@ def _build_user_profile(user_id: int) -> dict:
     if known_states.data:
         known_ids = [row["word_id"] for row in known_states.data]
         words = supabase.table("words").select("lemma").in_("id", known_ids).execute()
-        known_lemmas = [row["lemma"] for row in words.data]
+        known_lemmas = [row["lemma"] for row in words.data if row["lemma"]]
 
-    # 취약 단어 (mastery_score < 0.5)
+    # 취약 단어 (mastery_score > 0 AND < 0.5 — 복습했지만 약한 단어만)
     weak_word_states = (
         supabase.table("user_word_state")
         .select("word_id")
         .eq("user_id", user_id)
+        .gt("mastery_score", 0.0)
         .lt("mastery_score", 0.5)
         .execute()
     )
@@ -50,7 +53,7 @@ def _build_user_profile(user_id: int) -> dict:
     if weak_word_states.data:
         weak_ids = [row["word_id"] for row in weak_word_states.data]
         weak_words = supabase.table("words").select("lemma").in_("id", weak_ids).execute()
-        weak_word_lemmas = [row["lemma"] for row in weak_words.data]
+        weak_word_lemmas = [row["lemma"] for row in weak_words.data if row["lemma"]]
 
     # 취약 문법 (mastery_score < 0.5)
     grammar_states = (
@@ -160,6 +163,45 @@ def _fallback_words(german: str, known_lower: set[str], supabase) -> list[dict]:
     return words
 
 
+_SENTENCE_THEMES = [
+    "일상 대화", "카페/식당", "쇼핑", "여행", "직장/학교", "날씨",
+    "가족", "취미", "건강/병원", "교통", "집/이사", "친구 관계",
+]
+
+
+def _upsert_word_state(user_id: int, word_id: int, today: str, supabase) -> None:
+    try:
+        supabase.table("user_word_state").upsert({
+            "user_id": user_id,
+            "word_id": word_id,
+            "mastery_score": 0.0,
+            "next_review": today,
+        }, ignore_duplicates=True).execute()
+    except Exception:
+        pass
+
+
+def _save_word_to_db(w: dict, current_level: str, supabase) -> int | None:
+    """is_new 단어를 words 테이블에 저장하고 word_id 반환."""
+    existing = supabase.table("words").select("id").ilike("lemma", w["german"]).limit(1).execute()
+    if existing.data:
+        return existing.data[0]["id"]
+    try:
+        inserted = supabase.table("words").insert({
+            "lemma": w["german"],
+            "part_of_speech": w.get("part_of_speech", ""),
+            "translation": w.get("translation", ""),
+            "gender": w.get("gender"),
+            "plural": w.get("plural"),
+            "level": current_level,
+            "frequency": "common",
+        }).execute()
+        return inserted.data[0]["id"] if inserted.data else None
+    except Exception:
+        return None
+
+
+
 @router.post("/generate-sentences")
 def generate_sentences(req: GenerateSentencesRequest):
     supabase = get_supabase_client()
@@ -167,6 +209,10 @@ def generate_sentences(req: GenerateSentencesRequest):
     weak_grammar = profile["weak_grammar_rules"] or [
         {"rule_name": f"{profile['current_level']} general", "explanation": ""}
     ]
+
+    session_theme = random.choice(_SENTENCE_THEMES)
+    random_seed = datetime.now().strftime("%Y%m%d%H%M%S") + str(random.randint(100, 999))
+
     user_prompt = {
         "current_level": profile["current_level"],
         "weak_grammar_rules": weak_grammar[:5],
@@ -174,46 +220,73 @@ def generate_sentences(req: GenerateSentencesRequest):
         "weak_word_lemmas": profile["weak_word_lemmas"][:20],
         "review_due_lemmas": profile.get("review_due_lemmas", [])[:15],
         "count": req.count,
+        "session_theme": session_theme,
+        "random_seed": random_seed,
     }
     result = chat_json(SYSTEM_BASE + TEACHER_GENERATE_SENTENCES_PROMPT, json.dumps(user_prompt, ensure_ascii=False))
     if "sentences" not in result:
         raise HTTPException(status_code=502, detail="LLM이 올바른 응답을 반환하지 않았습니다.")
 
     known_lower = {lemma.lower() for lemma in profile["known_lemmas"]}
+    current_level = profile["current_level"]
+    today = date.today().isoformat()
 
     for sentence in result["sentences"]:
-        # LLM이 words를 비워서 반환한 경우 fallback 추출
         if not sentence.get("words"):
-            sentence["words"] = _fallback_words(sentence["german"], known_lower, supabase)
+            words = _fallback_words(sentence["german"], known_lower, supabase)
+            for w in words:
+                if w.get("is_new") and w.get("word_id") is None:
+                    w["word_id"] = _save_word_to_db(w, current_level, supabase)
+                if w.get("is_new") and w.get("word_id"):
+                    _upsert_word_state(req.user_id, w["word_id"], today, supabase)
+            sentence["words"] = words
         else:
             for w in sentence["words"]:
+                # 백엔드에서 is_new 재확인 (LLM 실수 보정)
+                w["is_new"] = w.get("is_new", False) and w["german"].lower() not in known_lower
                 if w.get("is_new"):
-                    existing = supabase.table("words").select("id").ilike("lemma", w["german"]).limit(1).execute()
-                    if existing.data:
-                        w["word_id"] = existing.data[0]["id"]
-                    else:
-                        try:
-                            inserted = supabase.table("words").insert({
-                                "german": w["german"],
-                                "part_of_speech": w["part_of_speech"],
-                                "translation": w["translation"],
-                                "gender": w.get("gender"),
-                                "plural": w.get("plural"),
-                                "level": profile["current_level"],
-                                "frequency": "common",
-                            }).execute()
-                            w["word_id"] = inserted.data[0]["id"] if inserted.data else None
-                        except Exception:
-                            w["word_id"] = None
+                    w["word_id"] = _save_word_to_db(w, current_level, supabase)
+                    if w["word_id"]:
+                        _upsert_word_state(req.user_id, w["word_id"], today, supabase)
                 else:
                     row = supabase.table("words").select("id").ilike("lemma", w["german"]).limit(1).execute()
                     w["word_id"] = row.data[0]["id"] if row.data else None
 
-        # verbs도 비어있으면 빈 리스트 보장
         if "verbs" not in sentence:
             sentence["verbs"] = []
 
     return {"status": "ok", "data": result}
+
+
+@router.post("/generate-scenario")
+def generate_scenario(req: GenerateScenarioRequest):
+    supabase = get_supabase_client()
+    profile = _build_user_profile(req.user_id)
+    user_prompt = {
+        "current_level": profile["current_level"],
+        "situation": req.situation,
+        "seed_sentence": req.seed_sentence,
+    }
+    result = chat_json(SYSTEM_BASE + TEACHER_GENERATE_SCENARIO_PROMPT, json.dumps(user_prompt, ensure_ascii=False))
+    if "dialogue_script" not in result:
+        raise HTTPException(status_code=502, detail="LLM이 올바른 응답을 반환하지 않았습니다.")
+
+    saved_id = None
+    if req.save:
+        try:
+            inserted = supabase.table("scenarios").insert({
+                "name": result.get("name", req.situation),
+                "level_min": result.get("level_min", profile["current_level"]),
+                "level_max": result.get("level_max", profile["current_level"]),
+                "description": result.get("description", ""),
+                "situation": result.get("situation", req.situation),
+                "dialogue_script": result.get("dialogue_script", {}),
+            }).execute()
+            saved_id = inserted.data[0]["id"] if inserted.data else None
+        except Exception:
+            pass
+
+    return {"status": "ok", "data": {"scenario": result, "saved_id": saved_id}}
 
 
 @router.post("/chat")

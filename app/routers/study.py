@@ -14,6 +14,7 @@ def review_today(
     user_id: int = Query(...),
     item_type: str = Query("word"),
     limit: int = Query(default=50, ge=1, le=200),
+    with_details: bool = Query(False),
 ):
     table_map = {
         "word": "user_word_state",
@@ -32,6 +33,12 @@ def review_today(
         .limit(limit)
         .execute()
     )
+    if with_details and item_type == "word" and result.data:
+        word_ids = [r["word_id"] for r in result.data]
+        words_res = supabase.table("words").select("id,lemma,translation,level,part_of_speech").in_("id", word_ids).execute()
+        word_map = {w["id"]: w for w in words_res.data}
+        for r in result.data:
+            r.update(word_map.get(r["word_id"], {}))
     return {"status": "ok", "data": result.data}
 
 

@@ -28,10 +28,10 @@ def get_embedding(text: str, model: str = "text-embedding-3-small") -> list[floa
 
 def chat_json(system_prompt: str, user_prompt: str, model: str | None = None):
     client = get_client()
-    model_name = model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    model_name = model or os.getenv("OPENAI_MODEL", "gpt-5.2")
     response = client.chat.completions.create(
         model=model_name,
-        temperature=0.4,
+        temperature=0.7,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},

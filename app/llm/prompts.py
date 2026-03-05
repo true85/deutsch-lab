@@ -61,10 +61,14 @@ Input JSON fields:
 - weak_word_lemmas: list of German lemmas the learner struggles with (incorporate these)
 - review_due_lemmas: list of German lemmas due for SM-2 review today (HIGHEST PRIORITY)
 - count: how many sentences to generate
+- session_theme: a random topic/situation to base the sentences on (REQUIRED — use it)
+- random_seed: a unique identifier for this request (use it to vary your output every time)
 
 Rules:
 - Prioritize review_due_lemmas above all other words — use as many as possible across the sentences
-- Each sentence MUST practice one of the weak_grammar_rules
+- Each sentence MUST practice a DIFFERENT grammar rule from weak_grammar_rules (cycle through them)
+- Each sentence MUST have a DIFFERENT main verb, subject, and situation — NO repetition across sentences
+- Base all sentences around the session_theme — different aspects of the same theme
 - Actively use words from known_lemmas where natural
 - Incorporate weak_word_lemmas into sentences where possible
 - Sentences should match current_level difficulty
@@ -72,8 +76,10 @@ Rules:
 - hint: short Korean hint about what goes in the blank
 - words field is REQUIRED — always include ALL nouns, verbs, adjectives, adverbs in the sentence
   (only exclude standalone articles like "der/die/das/ein" and standalone prepositions)
-  - is_new: true ONLY if the lemma is NOT in known_lemmas. Mark at most 2 words per sentence as is_new.
-    If known_lemmas is empty, still include all words but mark only the 2 most important as is_new.
+  - is_new: true ONLY if the lemma is NOT in known_lemmas.
+    REQUIRED: each sentence MUST introduce exactly 1 brand-new German word not in known_lemmas, marked is_new=true.
+    This new word must be a real German word appropriate for current_level.
+    Provide correct german, translation, part_of_speech, gender (if noun), plural (if noun) for is_new words.
 - verbs field is REQUIRED — always include ALL verbs with full present tense conjugation
   (if no conjugatable verb exists, return an empty list [])
 
@@ -101,6 +107,36 @@ Return ONLY valid JSON (no markdown, no extra text):
   ],
   "meta": {
     "weak_grammar_targets": ["list of grammar rule names addressed"]
+  }
+}
+"""
+
+TEACHER_GENERATE_SCENARIO_PROMPT = """Task: Create a German conversation scenario for a Korean-speaking learner.
+
+Input JSON fields:
+- current_level: learner's CEFR level (e.g. "A1", "B1")
+- situation: short description of the situation (e.g. "카페에서 커피 주문")
+- seed_sentence: optional German sentence to incorporate naturally into the dialogue
+
+Rules:
+- exchanges: 6~10 turns
+- Use vocabulary and grammar appropriate for current_level
+- If seed_sentence is provided, include it naturally in the dialogue
+- situation should be a short keyword (카페, 식당, 역 등)
+- level_min/level_max should be CEFR levels (A1–C2)
+
+Return ONLY valid JSON (no markdown, no extra text):
+{
+  "name": "시나리오 이름",
+  "level_min": "A1",
+  "level_max": "B1",
+  "description": "시나리오 설명 (한국어)",
+  "situation": "짧은 키워드",
+  "dialogue_script": {
+    "exchanges": [
+      {"speaker": "A", "german": "독일어 대사", "korean": "한국어 번역"},
+      {"speaker": "B", "german": "독일어 대사", "korean": "한국어 번역"}
+    ]
   }
 }
 """

@@ -49,6 +49,13 @@ class GeneratedSentence(BaseModel):
     verbs: list[VerbConjugation] = []
 
 
+class GenerateScenarioRequest(BaseModel):
+    user_id: int
+    situation: str
+    seed_sentence: Optional[str] = None
+    save: bool = True
+
+
 class ChatMessage(BaseModel):
     role: str  # "user" | "assistant"
     content: str

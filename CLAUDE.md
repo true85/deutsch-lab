@@ -5,7 +5,7 @@
 - **백엔드**: FastAPI (포트 8010)
 - **프론트엔드**: Streamlit
 - **DB**: Supabase (PostgreSQL + pgvector)
-- **LLM**: OpenAI (gpt-4o-mini)
+- **LLM**: OpenAI (gpt-5.2)
 
 ## 실행 명령어
 
@@ -28,7 +28,7 @@ pytest
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | - | Service Role Key (또는 ANON_KEY) |
 | `SUPABASE_ANON_KEY` | - | - | Anon Key (대안) |
 | `OPENAI_API_KEY` | - | - | OpenAI API 키 |
-| `OPENAI_MODEL` | - | `gpt-4o-mini` | 사용할 모델 |
+| `OPENAI_MODEL` | - | `gpt-5.2` | 사용할 모델 |
 | `API_KEY` | - | - | 미설정 시 인증 스킵 (개발 모드) |
 | `RATE_LIMIT_PER_MIN` | - | `120` | 분당 요청 제한 |
 
@@ -122,11 +122,15 @@ async def endpoint(user_id: str = Depends(verify_api_key)):
 - 신규 콘텐츠 20% + 복습 필요 콘텐츠 80% 비율로 추천
 
 ### AI 선생님 (`app/routers/teacher.py`)
-- `_build_user_profile(user_id)`: 공통 헬퍼 - 레벨/mastery/known_lemmas/weak_lemmas/weak_grammar 조회
+- `_build_user_profile(user_id)`: 공통 헬퍼 - 레벨/mastery/known_lemmas/weak_lemmas/weak_grammar/review_due_lemmas 조회
 - `POST /teacher/generate-words`: 사용자 프로필 기반 맞춤 단어 생성 (테마 옵션)
-- `POST /teacher/generate-sentences`: 취약 문법 집중 연습 문장 생성 (빈칸/힌트 포함)
+- `POST /teacher/generate-sentences`: 취약 문법 집중 연습 문장 생성
+  - 매 요청마다 `session_theme`(랜덤) + `random_seed` 주입 → 다양한 문장 보장
+  - is_new 단어 자동 DB 저장 + `user_word_state` upsert (ignore_duplicates)
+  - `blanked`/`hint` 빈칸 연습 없음
 - `POST /teacher/chat`: 히스토리 기반 개인화 대화 (free/correction/vocab_drill 모드)
 - 취약 판별 기준: `mastery_score < 0.5` (success_count 컬럼 미사용)
+- LLM 호출: `chat_json()` — model=gpt-5.2, temperature=0.7
 
 ## 주요 DB 테이블
 
@@ -142,10 +146,17 @@ async def endpoint(user_id: str = Depends(verify_api_key)):
 ### 학습 진도 테이블
 | 테이블 | 설명 |
 |--------|------|
-| `user_word_state` | 단어별 SM-2 상태 |
+| `user_word_state` | 단어별 SM-2 상태 (mastery_score, next_review 포함) |
 | `user_grammar_state` | 문법별 SM-2 상태 |
 | `user_expression_state` | 표현별 SM-2 상태 |
 | `user_scenario_state` | 시나리오별 SM-2 상태 |
+
+### 취약 단어 관련 엔드포인트
+| 엔드포인트 | 설명 |
+|-----------|------|
+| `POST /user-state/words/mark` | 단어 복습 등록 (idempotent upsert) |
+| `POST /user-state/words/unmark` | 단어 복습 삭제 (user_id + word_id) |
+| `GET /recommend/weak-words` | mastery 낮은 순 취약 단어 목록 |
 
 ## 주의사항
 

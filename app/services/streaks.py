@@ -2,8 +2,15 @@ from datetime import date, datetime, timedelta
 
 
 def _parse_date(value: str) -> date:
+    # Strip timezone suffix (Z or ±HH:MM)
     if value.endswith("Z"):
-        value = value[:-1] + "+00:00"
+        value = value[:-1]
+    elif len(value) > 19 and value[-6] in ("+", "-"):
+        value = value[:-6]
+    # Normalize fractional seconds to 6 digits (Python 3.10 fromisoformat requirement)
+    if "." in value:
+        base, frac = value.rsplit(".", 1)
+        value = f"{base}.{frac.ljust(6, '0')[:6]}"
     return datetime.fromisoformat(value).date()
 
 

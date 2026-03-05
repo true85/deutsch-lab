@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import rate_limit_per_min, validate_env
@@ -29,6 +30,12 @@ setup_logging()
 app = FastAPI()
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware, max_requests=rate_limit_per_min())
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["POST"],
+    allow_headers=["Content-Type"],
+)
 app.include_router(health_router)
 app.include_router(words_router)
 app.include_router(grammar_router)

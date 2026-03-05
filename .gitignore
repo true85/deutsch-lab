@@ -11,3 +11,5 @@ logs/
 .streamlit.*.txt
 .uvicorn.*.txt
 archive/
+*.png
+.playwright-mcp/
