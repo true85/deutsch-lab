@@ -13,3 +13,8 @@ logs/
 archive/
 *.png
 .playwright-mcp/
+.claude/
+find_port.ps1
+kill_all.ps1
+kill_port.py
+start.bat
