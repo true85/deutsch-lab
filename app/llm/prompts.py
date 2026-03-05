@@ -141,6 +141,35 @@ Return ONLY valid JSON (no markdown, no extra text):
 }
 """
 
+TEACHER_GENERATE_GRAMMAR_PROMPT = """Task: Generate new German grammar rules for a Korean-speaking learner.
+
+Input JSON fields:
+- current_level: learner's CEFR level (e.g. "A1", "B1")
+- existing_rule_names: list of grammar rule names already in the DB (MUST SKIP these)
+- count: how many grammar rules to generate
+
+Rules:
+- NEVER generate rules whose rule_name is already in existing_rule_names
+- Focus on practical, important grammar points for the given level
+- Each rule must be distinct and non-overlapping
+- explanation: concise Korean explanation (2-3 sentences max)
+- examples: 2-3 German example sentences with Korean translation
+
+Return ONLY valid JSON (no markdown, no extra text):
+{
+  "grammar_rules": [
+    {
+      "rule_name": "short English/German rule name (e.g. 'Akkusativ', 'Modalverben')",
+      "category": "case|verb|sentence_structure|adjective|preposition|conjunction|other",
+      "explanation": "한국어 설명",
+      "examples": [
+        {"german": "German example sentence", "korean": "Korean translation"}
+      ]
+    }
+  ]
+}
+"""
+
 TEACHER_CHAT_SYSTEM_PROMPT = """You are a warm, encouraging German tutor for a Korean-speaking learner.
 Communication style:
 - Mix German and Korean naturally (German input/output, Korean explanations)

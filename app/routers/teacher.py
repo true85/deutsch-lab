@@ -9,12 +9,13 @@ from app.llm.prompts import (
     SYSTEM_BASE,
     TEACHER_CHAT_PROMPT,
     TEACHER_CHAT_SYSTEM_PROMPT,
+    TEACHER_GENERATE_GRAMMAR_PROMPT,
     TEACHER_GENERATE_SCENARIO_PROMPT,
     TEACHER_GENERATE_SENTENCES_PROMPT,
     TEACHER_GENERATE_WORDS_PROMPT,
 )
 from app.routers.recommend import _get_user_avg_mastery, _get_user_current_level
-from app.schemas.teacher import ChatRequest, GenerateScenarioRequest, GenerateSentencesRequest, GenerateWordsRequest
+from app.schemas.teacher import ChatRequest, GenerateGrammarRequest, GenerateScenarioRequest, GenerateSentencesRequest, GenerateWordsRequest
 from app.supabase_client import get_supabase_client
 
 router = APIRouter(prefix="/teacher", tags=["teacher"])
@@ -200,6 +201,59 @@ def _save_word_to_db(w: dict, current_level: str, supabase) -> int | None:
     except Exception:
         return None
 
+
+
+@router.post("/generate-grammar")
+def generate_grammar(req: GenerateGrammarRequest):
+    supabase = get_supabase_client()
+    level = req.level or _get_user_current_level(req.user_id)
+
+    existing = supabase.table("grammar").select("rule_name").eq("level", level).execute()
+    existing_names = [row["rule_name"] for row in existing.data] if existing.data else []
+
+    user_prompt = {
+        "current_level": level,
+        "existing_rule_names": existing_names,
+        "count": req.count,
+    }
+    result = chat_json(SYSTEM_BASE + TEACHER_GENERATE_GRAMMAR_PROMPT, json.dumps(user_prompt, ensure_ascii=False))
+    if "grammar_rules" not in result:
+        raise HTTPException(status_code=502, detail="LLM이 올바른 응답을 반환하지 않았습니다.")
+
+    saved, skipped = 0, 0
+    saved_rules = []
+    for rule in result["grammar_rules"]:
+        rule_name = rule.get("rule_name", "")
+        if not rule_name:
+            skipped += 1
+            continue
+        # 중복 체크 (ilike)
+        dup = supabase.table("grammar").select("id").ilike("rule_name", rule_name).limit(1).execute()
+        if dup.data:
+            skipped += 1
+            continue
+        try:
+            raw_examples = rule.get("examples", [])
+            examples_str = [
+                f"{ex['german']} — {ex['korean']}" if isinstance(ex, dict) else str(ex)
+                for ex in raw_examples
+            ]
+            inserted = supabase.table("grammar").insert({
+                "rule_name": rule_name,
+                "category": rule.get("category", "other"),
+                "explanation": rule.get("explanation", ""),
+                "examples": examples_str,
+                "level": level,
+            }).execute()
+            if inserted.data:
+                saved += 1
+                saved_rules.append(inserted.data[0])
+            else:
+                skipped += 1
+        except Exception:
+            skipped += 1
+
+    return {"status": "ok", "data": {"saved": saved, "skipped": skipped, "rules": saved_rules}}
 
 
 @router.post("/generate-sentences")

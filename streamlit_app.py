@@ -485,8 +485,8 @@ user_id = st.session_state.get("user_id", 1)
 base_url = st.session_state.get("cfg_base_url", BASE_DEFAULT)
 
 # ── 상단 탭 ──────────────────────────────────────────────────────────────────
-tab_dash, tab_scenario, tab_search, tab_teacher = st.tabs(
-    ["대시보드", "시나리오", "검색", "AI 선생님"]
+tab_dash, tab_grammar, tab_scenario, tab_search, tab_teacher = st.tabs(
+    ["대시보드", "문법", "시나리오", "검색", "AI 선생님"]
 )
 
 if st.session_state.pop("dash_go_scenario", False):
@@ -732,6 +732,60 @@ with tab_scenario:
                         _render_scenario_card(scenario, f"done_sc_btn_{scenario['id']}", f"done_sc_q_{scenario['id']}")
     except Exception as exc:
         st.error(str(exc))
+
+with tab_grammar:
+    st.subheader("문법 학습")
+
+    _LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"]
+    _grammar_level = st.selectbox("레벨 선택", _LEVELS, key="grammar_level_sel")
+
+    # 문법 목록 로드
+    try:
+        grammar_list_res = api_get(base_url, "/grammar", {"level": _grammar_level, "limit": 100})
+        grammar_list = grammar_list_res.get("data", [])
+    except Exception:
+        grammar_list = []
+
+    # 사용자 학습 완료 grammar_id 목록
+    try:
+        g_states_res = api_get(base_url, "/user-state/grammar", {"user_id": user_id, "limit": 200})
+        learned_grammar_ids = {row["grammar_id"] for row in g_states_res.get("data", [])}
+    except Exception:
+        learned_grammar_ids = set()
+
+    if not grammar_list:
+        st.info("이 레벨의 문법 규칙이 없습니다. 'AI로 문법 생성' 버튼을 눌러주세요.")
+    else:
+        st.caption(f"총 {len(grammar_list)}개 규칙")
+        for g in grammar_list:
+            gid = g["id"]
+            is_learned = gid in learned_grammar_ids
+            badge = "✅ " if is_learned else ""
+            category = g.get("category") or ""
+            cat_badge = f" `{category}`" if category else ""
+            with st.container():
+                col_l, col_r = st.columns([6, 1])
+                with col_l:
+                    st.markdown(f"**{badge}{g['rule_name']}**{cat_badge}")
+                    st.caption(g.get("explanation", ""))
+                with col_r:
+                    if not is_learned:
+                        if st.button("학습 완료", key=f"gmark_{gid}"):
+                            try:
+                                api_post(
+                                    base_url,
+                                    "/user-state/grammar/mark",
+                                    {"user_id": user_id, "grammar_id": gid},
+                                )
+                                st.rerun()
+                            except Exception as exc:
+                                st.error(str(exc))
+                examples = g.get("examples") or []
+                if examples:
+                    with st.expander("예문 보기"):
+                        for ex in examples:
+                            st.markdown(f"- {ex}")
+                st.divider()
 
 with tab_search:
     st.subheader("벡터 검색")

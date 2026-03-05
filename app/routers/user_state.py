@@ -176,6 +176,36 @@ def delete_word_state(state_id: int):
     return _delete_state("user_word_state", state_id)
 
 
+@router.post("/grammar/mark")
+def mark_grammar_for_review(
+    user_id: int = Body(...),
+    grammar_id: int = Body(...),
+):
+    """문법 학습 완료 표시 — idempotent upsert"""
+    from datetime import date
+    supabase = get_supabase_client()
+    today = date.today().isoformat()
+    existing = (
+        supabase.table("user_grammar_state")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("grammar_id", grammar_id)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        return {"status": "ok"}
+    result = supabase.table("user_grammar_state").insert({
+        "user_id": user_id,
+        "grammar_id": grammar_id,
+        "mastery_score": 0.0,
+        "next_review": today,
+    }).execute()
+    if not result.data:
+        raise HTTPException(status_code=400, detail="Failed to mark grammar")
+    return {"status": "ok"}
+
+
 @router.get("/grammar")
 def list_grammar_states(
     user_id: int | None = Query(default=None),
