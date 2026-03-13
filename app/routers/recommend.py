@@ -89,21 +89,18 @@ def recommend_weak_words(
     supabase = get_supabase_client()
     states = (
         supabase.table("user_word_state")
-        .select("*")
+        .select("word_id,mastery_score")
         .eq("user_id", user_id)
+        .gt("mastery_score", 0.0)
+        .lt("mastery_score", 0.5)
+        .order("mastery_score", desc=False)
+        .limit(limit)
         .execute()
     )
     if not states.data:
         return {"status": "ok", "data": []}
-
-    scored = []
-    for row in states.data:
-        total = row.get("success_count", 0) + row.get("fail_count", 0)
-        rate = row.get("success_count", 0) / total if total else 0.0
-        scored.append((row["word_id"], rate))
-    scored.sort(key=lambda x: x[1])
-    top_ids = [wid for wid, _ in scored[:limit]]
-    result = supabase.table("words").select("*").in_("id", top_ids).execute()
+    word_ids = [row["word_id"] for row in states.data]
+    result = supabase.table("words").select("*").in_("id", word_ids).execute()
     return {"status": "ok", "data": result.data}
 
 

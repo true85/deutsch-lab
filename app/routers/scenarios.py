@@ -97,7 +97,10 @@ def practice_scenario(
             state.get("interval_days", 0),
             state.get("ease_factor", 2.7),
         )
-        new_mastery = min(1.0, state.get("mastery_score", 0.0) + 0.1 * (quality / 5))
+        if quality == 5:
+            new_mastery = 1.0
+        else:
+            new_mastery = min(0.9, state.get("mastery_score", 0.0) + 0.1 * (quality / 5))
         update_data = {
             "times_practiced": state.get("times_practiced", 0) + 1,
             "last_practiced": today,
@@ -119,7 +122,7 @@ def practice_scenario(
             "interval_days": schedule["interval_days"],
             "ease_factor": schedule["ease_factor"],
             "next_review": schedule["next_review"],
-            "mastery_score": round(0.1 * (quality / 5), 4),
+            "mastery_score": 1.0 if quality == 5 else round(0.1 * (quality / 5), 4),
         }
         result = supabase.table("user_scenario_state").insert(insert_data).execute()
 
