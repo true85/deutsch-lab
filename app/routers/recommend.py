@@ -89,21 +89,18 @@ def recommend_weak_words(
     supabase = get_supabase_client()
     states = (
         supabase.table("user_word_state")
-        .select("*")
+        .select("word_id,mastery_score")
         .eq("user_id", user_id)
+        .gt("mastery_score", 0.0)
+        .lt("mastery_score", 0.5)
+        .order("mastery_score", desc=False)
+        .limit(limit)
         .execute()
     )
     if not states.data:
         return {"status": "ok", "data": []}
-
-    scored = []
-    for row in states.data:
-        total = row.get("success_count", 0) + row.get("fail_count", 0)
-        rate = row.get("success_count", 0) / total if total else 0.0
-        scored.append((row["word_id"], rate))
-    scored.sort(key=lambda x: x[1])
-    top_ids = [wid for wid, _ in scored[:limit]]
-    result = supabase.table("words").select("*").in_("id", top_ids).execute()
+    word_ids = [row["word_id"] for row in states.data]
+    result = supabase.table("words").select("*").in_("id", word_ids).execute()
     return {"status": "ok", "data": result.data}
 
 
@@ -219,8 +216,20 @@ def recommend_today_bundle(
         extra_ids = [row["id"] for row in review_words.data if row["id"] not in set(word_ids)]
         word_ids = word_ids + extra_ids[:new_word_count]
 
+    # 철학: 문장 학습이 1순위. review_due_lemmas를 최우선으로 노출.
+    review_due_lemmas: list[str] = []
+    if word_ids:
+        review_words = supabase.table("words").select("lemma").in_("id", word_ids[:15]).execute()
+        review_due_lemmas = [row["lemma"] for row in review_words.data if row.get("lemma")]
+
     if not word_ids:
-        return {"status": "ok", "data": {"words": [], "expressions": [], "scenarios": []}}
+        return {
+            "status": "ok",
+            "data": {
+                "words": [], "expressions": [], "scenarios": [],
+                "sentence_practice": {"review_due_lemmas": [], "ready": False},
+            },
+        }
 
     word_rows = supabase.table("words").select("*").in_("id", word_ids).execute()
     expr_rows = (
@@ -266,6 +275,10 @@ def recommend_today_bundle(
     return {
         "status": "ok",
         "data": {
+            "sentence_practice": {
+                "review_due_lemmas": review_due_lemmas,
+                "ready": len(review_due_lemmas) > 0,
+            },
             "words": word_rows.data,
             "expressions": expressions,
             "scenarios": scenarios,

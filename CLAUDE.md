@@ -5,7 +5,7 @@
 - **백엔드**: FastAPI (포트 8010)
 - **프론트엔드**: Streamlit
 - **DB**: Supabase (PostgreSQL + pgvector)
-- **LLM**: OpenAI (gpt-4o-mini)
+- **LLM**: OpenAI (gpt-5.2)
 
 ## 실행 명령어
 
@@ -28,7 +28,7 @@ pytest
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | - | Service Role Key (또는 ANON_KEY) |
 | `SUPABASE_ANON_KEY` | - | - | Anon Key (대안) |
 | `OPENAI_API_KEY` | - | - | OpenAI API 키 |
-| `OPENAI_MODEL` | - | `gpt-4o-mini` | 사용할 모델 |
+| `OPENAI_MODEL` | - | `gpt-5.2` | 사용할 모델 |
 | `API_KEY` | - | - | 미설정 시 인증 스킵 (개발 모드) |
 | `RATE_LIMIT_PER_MIN` | - | `120` | 분당 요청 제한 |
 
@@ -37,7 +37,7 @@ pytest
 ```
 app/
 ├── main.py               # FastAPI 앱 진입점
-├── routers/              # 18개 API 라우터
+├── routers/              # 14개 API 라우터
 │   ├── words.py          # 단어 CRUD + 학습 상태
 │   ├── grammar.py        # 문법 CRUD + 학습 상태
 │   ├── expressions.py    # 표현 CRUD + 학습 상태
@@ -122,11 +122,28 @@ async def endpoint(user_id: str = Depends(verify_api_key)):
 - 신규 콘텐츠 20% + 복습 필요 콘텐츠 80% 비율로 추천
 
 ### AI 선생님 (`app/routers/teacher.py`)
-- `_build_user_profile(user_id)`: 공통 헬퍼 - 레벨/mastery/known_lemmas/weak_lemmas/weak_grammar 조회
-- `POST /teacher/generate-words`: 사용자 프로필 기반 맞춤 단어 생성 (테마 옵션)
-- `POST /teacher/generate-sentences`: 취약 문법 집중 연습 문장 생성 (빈칸/힌트 포함)
+- `_build_user_profile(user_id)`: 공통 헬퍼 — 레벨/mastery/known_lemmas/weak_lemmas/weak_grammar/review_due_lemmas 조회
+- `POST /teacher/generate-sentences`: 취약 문법 + 복습 예정 단어 집중 문장 생성
+  - 매 요청마다 `session_theme`(랜덤) + `random_seed` 주입 → 다양한 문장 보장
+  - **통합 검증 루프**: 커버리지(review_due ≥ min(len,3))와 학습 가치(모든 문장에 review_due 또는 신규 단어 1개)를 **단일 validator로 합쳐** 최대 1회 재시도. 재시도는 `temperature=0.3` + `must_include_lemmas[:count]` 상한. 총 LLM 호출은 최대 **2회**.
+  - 신규 단어는 `words` 테이블에 자동 저장 + embedding 자동 생성 (`get_embedding`은 lemma+pos+translation 포맷)
+  - **신규 단어를 `user_word_state`에 자동 등록하지 않음** — 복습 큐는 사용자 클릭 시점에만 채워짐
+  - `blanked`/`hint` 빈칸 연습 없음
+  - 응답 메타: `review_coverage`, `learning_value` 포함
+- `POST /teacher/generate-grammar`: 레벨별 문법 규칙 일괄 생성 (중복 제외 후 DB 저장)
+- `POST /teacher/generate-scenario`: 상황 기반 대화 시나리오 생성 (옵션 저장)
 - `POST /teacher/chat`: 히스토리 기반 개인화 대화 (free/correction/vocab_drill 모드)
-- 취약 판별 기준: `mastery_score < 0.5` (success_count 컬럼 미사용)
+- 취약 판별 기준: `mastery_score < 0.5`
+- LLM 호출: `chat_json(system, user, temperature=0.7, retry_on_parse=True)` — `response_format=json_object`. `retry_on_parse=False`로 외부 루프가 재시도 관리 시 내부 재시도 비활성화 가능.
+- **`_build_user_profile` 결정론**: known(mastery desc), weak(mastery asc), review_due(next_review asc) + 2차 정렬 `word_id`로 세션 간 안정적 샘플링.
+
+### Supabase 클라이언트
+- `get_supabase_client()` — `lru_cache(maxsize=1)`로 싱글톤. 매 요청 재생성 방지
+
+### 레이트 제한 (`app/middleware/rate_limit.py`)
+- IP 추출 우선순위: `X-Forwarded-For` (좌측) → `X-Real-IP` → `request.client.host`
+- 5분마다 stale IP GC로 메모리 누수 방지
+- 멀티 워커 환경에서는 워커별 카운터 → 단일 워커 권장 (또는 Redis 백엔드 도입)
 
 ## 주요 DB 테이블
 
@@ -142,10 +159,20 @@ async def endpoint(user_id: str = Depends(verify_api_key)):
 ### 학습 진도 테이블
 | 테이블 | 설명 |
 |--------|------|
-| `user_word_state` | 단어별 SM-2 상태 |
+| `user_word_state` | 단어별 SM-2 상태 (mastery_score, next_review 포함) |
 | `user_grammar_state` | 문법별 SM-2 상태 |
 | `user_expression_state` | 표현별 SM-2 상태 |
 | `user_scenario_state` | 시나리오별 SM-2 상태 |
+
+### 단어 학습 관련 엔드포인트
+| 엔드포인트 | 설명 |
+|-----------|------|
+| `POST /user-state/words/mark` | 단어 복습 등록 (idempotent upsert). UI 단어 클릭 시 호출 |
+| `POST /user-state/words/unmark` | 단어 복습 삭제 (user_id + word_id) |
+| `GET /recommend/weak-words` | mastery 낮은 순 취약 단어 목록 |
+| `GET /user-state/words/today` | 오늘 `words` 테이블에 추가된 신규 단어 목록 (lemma 기준) |
+| `GET /user-state/words/today-count` | 위 목록의 카운트 |
+| `GET /recommend/today` | 오늘 학습 번들 — `sentence_practice` 블록 포함 (대시보드 CTA) |
 
 ## 주의사항
 
@@ -168,7 +195,7 @@ async def endpoint(user_id: str = Depends(verify_api_key)):
 ## 검증
 
 ```bash
-# 테스트 실행 (5개 통과 확인)
+# 테스트 실행 (60개 통과 확인)
 pytest
 
 # 헬스 체크

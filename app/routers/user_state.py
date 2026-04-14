@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from app.middleware.auth import verify_api_key
@@ -66,7 +68,7 @@ def mark_word_for_review(
     word_id: int = Body(...),
 ):
     """단어 복습 표시 — 기존 상태도 next_review=today로 갱신해 review_due_lemmas에 포함"""
-    from datetime import date
+
     supabase = get_supabase_client()
     today = date.today().isoformat()
     existing = (
@@ -92,6 +94,52 @@ def mark_word_for_review(
     if not result.data:
         raise HTTPException(status_code=400, detail="Failed to mark word")
     return {"status": "ok", "data": result.data[0], "created": True}
+
+
+@router.get("/words/today")
+def words_learned_today_list(user_id: int = Query(...)):
+    """오늘 DB에 새로 추가된 단어 목록 (문장 생성 중 발견된 신규 단어)"""
+
+    supabase = get_supabase_client()
+    today = date.today().isoformat()
+    result = (
+        supabase.table("words")
+        .select("id,lemma,translation,part_of_speech,gender,created_at")
+        .gte("created_at", today)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return {"status": "ok", "data": result.data or []}
+
+
+@router.get("/words/today-count")
+def words_learned_today(user_id: int = Query(...)):
+    """오늘 DB에 새로 추가된 단어 수"""
+
+    supabase = get_supabase_client()
+    today = date.today().isoformat()
+    result = (
+        supabase.table("words")
+        .select("id", count="exact")
+        .gte("created_at", today)
+        .execute()
+    )
+    return {"status": "ok", "data": {"count": result.count or 0}}
+
+
+@router.post("/words/unmark")
+def unmark_word(
+    user_id: int = Body(...),
+    word_id: int = Body(...),
+):
+    """단어 복습 마킹 취소 — user_word_state 행 삭제"""
+    supabase = get_supabase_client()
+    supabase.table("user_word_state") \
+        .delete() \
+        .eq("user_id", user_id) \
+        .eq("word_id", word_id) \
+        .execute()
+    return {"status": "ok"}
 
 
 @router.get("/words")
@@ -121,6 +169,36 @@ def update_word_state(state_id: int, payload: UserWordStateUpdate):
 @router.delete("/words/{state_id}")
 def delete_word_state(state_id: int):
     return _delete_state("user_word_state", state_id)
+
+
+@router.post("/grammar/mark")
+def mark_grammar_for_review(
+    user_id: int = Body(...),
+    grammar_id: int = Body(...),
+):
+    """문법 학습 완료 표시 — idempotent upsert"""
+
+    supabase = get_supabase_client()
+    today = date.today().isoformat()
+    existing = (
+        supabase.table("user_grammar_state")
+        .select("id")
+        .eq("user_id", user_id)
+        .eq("grammar_id", grammar_id)
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        return {"status": "ok"}
+    result = supabase.table("user_grammar_state").insert({
+        "user_id": user_id,
+        "grammar_id": grammar_id,
+        "mastery_score": 0.0,
+        "next_review": today,
+    }).execute()
+    if not result.data:
+        raise HTTPException(status_code=400, detail="Failed to mark grammar")
+    return {"status": "ok"}
 
 
 @router.get("/grammar")

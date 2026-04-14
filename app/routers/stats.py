@@ -35,13 +35,13 @@ def overview(user_id: int = Query(...)):
     mastered_count = mastered_words.count or 0
 
     logs = (
-        supabase.table("study_log")
-        .select("timestamp")
+        supabase.table("user_word_state")
+        .select("created_at")
         .eq("user_id", user_id)
         .limit(2000)
         .execute()
     )
-    timestamps = [row["timestamp"] for row in logs.data]
+    timestamps = [row["created_at"] for row in logs.data]
     streaks = compute_streaks(timestamps)
 
     return {
