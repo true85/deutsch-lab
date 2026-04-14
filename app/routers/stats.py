@@ -19,8 +19,8 @@ def _count(table: str, **filters):
 def overview(user_id: int = Query(...)):
     supabase = get_supabase_client()
     totals = {
-        "words": _count("words") + _count("user_word_state", user_id=user_id),
-        "grammar": _count("grammar") + _count("user_grammar_state", user_id=user_id),
+        "words": _count("words"),
+        "grammar": _count("grammar"),
         "expressions": _count("expressions"),
         "scenarios": _count("scenarios"),
     }

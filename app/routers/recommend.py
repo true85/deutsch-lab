@@ -216,8 +216,20 @@ def recommend_today_bundle(
         extra_ids = [row["id"] for row in review_words.data if row["id"] not in set(word_ids)]
         word_ids = word_ids + extra_ids[:new_word_count]
 
+    # 철학: 문장 학습이 1순위. review_due_lemmas를 최우선으로 노출.
+    review_due_lemmas: list[str] = []
+    if word_ids:
+        review_words = supabase.table("words").select("lemma").in_("id", word_ids[:15]).execute()
+        review_due_lemmas = [row["lemma"] for row in review_words.data if row.get("lemma")]
+
     if not word_ids:
-        return {"status": "ok", "data": {"words": [], "expressions": [], "scenarios": []}}
+        return {
+            "status": "ok",
+            "data": {
+                "words": [], "expressions": [], "scenarios": [],
+                "sentence_practice": {"review_due_lemmas": [], "ready": False},
+            },
+        }
 
     word_rows = supabase.table("words").select("*").in_("id", word_ids).execute()
     expr_rows = (
@@ -263,6 +275,10 @@ def recommend_today_bundle(
     return {
         "status": "ok",
         "data": {
+            "sentence_practice": {
+                "review_due_lemmas": review_due_lemmas,
+                "ready": len(review_due_lemmas) > 0,
+            },
             "words": word_rows.data,
             "expressions": expressions,
             "scenarios": scenarios,

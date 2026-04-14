@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from app.middleware.auth import verify_api_key
@@ -66,7 +68,7 @@ def mark_word_for_review(
     word_id: int = Body(...),
 ):
     """단어 복습 표시 — 기존 상태도 next_review=today로 갱신해 review_due_lemmas에 포함"""
-    from datetime import date
+
     supabase = get_supabase_client()
     today = date.today().isoformat()
     existing = (
@@ -96,36 +98,29 @@ def mark_word_for_review(
 
 @router.get("/words/today")
 def words_learned_today_list(user_id: int = Query(...)):
-    """오늘 새로 등록된 단어 목록 (words 테이블 조인)"""
-    from datetime import date
+    """오늘 DB에 새로 추가된 단어 목록 (문장 생성 중 발견된 신규 단어)"""
+
     supabase = get_supabase_client()
     today = date.today().isoformat()
     result = (
-        supabase.table("user_word_state")
-        .select("word_id,mastery_score,created_at")
-        .eq("user_id", user_id)
+        supabase.table("words")
+        .select("id,lemma,translation,part_of_speech,gender,created_at")
         .gte("created_at", today)
+        .order("created_at", desc=True)
         .execute()
     )
-    if result.data:
-        word_ids = [r["word_id"] for r in result.data]
-        words_res = supabase.table("words").select("id,lemma,translation,part_of_speech,gender").in_("id", word_ids).execute()
-        word_map = {w["id"]: w for w in words_res.data}
-        for r in result.data:
-            r.update(word_map.get(r["word_id"], {}))
-    return {"status": "ok", "data": result.data}
+    return {"status": "ok", "data": result.data or []}
 
 
 @router.get("/words/today-count")
 def words_learned_today(user_id: int = Query(...)):
-    """오늘 새로 등록된 단어 수 (user_word_state.created_at 기준)"""
-    from datetime import date
+    """오늘 DB에 새로 추가된 단어 수"""
+
     supabase = get_supabase_client()
     today = date.today().isoformat()
     result = (
-        supabase.table("user_word_state")
+        supabase.table("words")
         .select("id", count="exact")
-        .eq("user_id", user_id)
         .gte("created_at", today)
         .execute()
     )
@@ -182,7 +177,7 @@ def mark_grammar_for_review(
     grammar_id: int = Body(...),
 ):
     """문법 학습 완료 표시 — idempotent upsert"""
-    from datetime import date
+
     supabase = get_supabase_client()
     today = date.today().isoformat()
     existing = (

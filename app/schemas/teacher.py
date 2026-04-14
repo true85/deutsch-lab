@@ -2,23 +2,6 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class GenerateWordsRequest(BaseModel):
-    user_id: int
-    count: Optional[int] = 5
-    theme: Optional[str] = None
-
-
-class GeneratedWord(BaseModel):
-    german: str
-    part_of_speech: str
-    gender: Optional[str] = None
-    plural: Optional[str] = None
-    translation: str
-    example_sentence: str
-    example_translation: str
-    level: str
-
-
 class GenerateSentencesRequest(BaseModel):
     user_id: int
     count: Optional[int] = 5

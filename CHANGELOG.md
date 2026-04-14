@@ -1,5 +1,65 @@
 # Changelog
 
+## [0.4.1] - 2026-04-14 — 2차 리뷰 반영 (UI 톤다운 · 재시도 통합 · 결정론화)
+
+### Added
+- **`chat_json` `temperature` · `retry_on_parse` 파라미터** (`app/llm/openai_client.py`): 재시도 루프에서 temperature=0.3으로 규칙 준수율↑, 외부 루프가 재시도 관리할 때 내부 재시도 중복 방지.
+- **race 방어** (`teacher.py::_save_word_to_db`): insert 시 Unique violation(SQL 23505) 발생하면 ilike 재조회로 기존 id 반환.
+- **`tests/test_rate_limit.py`** (7개): X-Forwarded-For 우선, X-Real-IP fallback, `_gc_stale` interval/대상, `_allow_paths` 구성.
+- **`tests/test_user_state.py`** (3개): `words/today[-count]`가 `words.created_at` 기준 + user_id 미사용 동작 고정.
+
+### Changed
+- **UI 전면 Apple 톤다운** (`streamlit_app.py`):
+  - 폰트: Google Fonts 제거 → `-apple-system, BlinkMacSystemFont, "SF Pro Text"` 스택
+  - 팔레트: 머스터드(#c98a00) 제거 → 잉크(#1d1d1f) + 링크 블루(#0066cc)
+  - 배경: radial orb 2개 + 135° grain 제거 → solid `#fbfbfd`
+  - 카드: radius 20→12~14, box-shadow 제거, hover 시 hairline만
+  - 버튼: 10px → pill(980px), primary(black solid)/secondary(white stroke) 위계
+  - 이모지 정리: 탭/헤더/CTA/빈 상태/토스트/완료 배지에서 제거. SM-2 품질 라디오(😵😕🤔🙂😎🎉)와 `st.balloons()`는 기능적 의미로 유지
+  - 헤더: `🇩🇪 Deutsch Lab` 로고 → 작은 캡스 `DEUTSCH LAB`
+  - 펄스 애니메이션 색: 노랑 → 블루
+- **재시도 루프 통합** (`teacher.py::generate_sentences`): 커버리지 검증과 학습 가치 검증을 별도 2회 → **단일 검증기 1회 재시도**로 합침. 최대 LLM 호출 수 5회 → **2회**. 재시도는 temperature=0.3으로.
+- **`_build_user_profile` 결정론화** (`teacher.py`): known(`order mastery_score desc`), weak(`order asc`), review_due(`order next_review asc`) + 2차 정렬 `word_id`로 세션 간 안정적인 LLM 프롬프트 보장.
+- **`must_include_lemmas` 상한**: 재시도 시 `req.count` 개수를 넘지 않도록 슬라이스 (LLM 과부하 방지).
+
+### Removed
+- **미사용 상수/스키마** — `TEACHER_GENERATE_WORDS_PROMPT` (`app/llm/prompts.py`), `GenerateWordsRequest`·`GeneratedWord` (`app/schemas/teacher.py`).
+
+### Tests
+- 49 → **60 passed** (신규 10개, 기존 기능 시그니처 변경 대응).
+
+---
+
+## [0.4.0] - 2026-04-14 — 학습 가치 강화 & 5축 정비
+
+### Added
+- **학습 가치 룰** (`teacher.py`): 모든 문장이 (review_due 단어 OR 신규 단어) 최소 1개를 포함하도록 백엔드 검증 + 1회 재시도. 응답에 `learning_value: {total, valuable, valueless_indices}` 메타.
+- **SM-2 재등장 보장 루프** (`teacher.py`): review_due 커버리지 < min(len, 3)이면 `must_include_lemmas` 주입해 1회 재시도. 응답에 `review_coverage` 메타.
+- **신규 단어 embedding 자동 생성** (`teacher.py::_save_word_to_db`): `lemma (pos): translation` 포맷으로 임베딩 입력 구성 (동음이의 구분력 향상).
+- **`/recommend/today` `sentence_practice` 블록**: 대시보드 최상단 "📝 오늘의 문장 연습 준비 완료" CTA의 데이터 소스.
+- **`tests/test_teacher.py`** (8개): `_extract_used_lemmas`, `_save_word_to_db` (3 케이스), `generate_sentences` 재등장/학습가치 루프.
+- **`tests/test_sm2.py`** parametrize 확장 (9개 → 11개): quality 경계, ease_factor 방향성, EF 하한 1.3.
+
+### Changed
+- **`/teacher/generate-sentences` 정책 변경**: 신규 단어를 `user_word_state`에 자동 등록하지 않음. 복습 큐 등록은 사용자 클릭(`/user-state/words/mark`) 시점에만.
+- **`/user-state/words/today[-count]` 의미 변경**: `user_word_state.created_at` → `words.created_at`. 오늘 DB에 새로 추가된 단어를 카운트.
+- **탭 순서 재배치**: `📝 문장 학습`(기본) → `대시보드` → `시나리오` → `문법` → `검색`.
+- **`chat_json` 견고화** (`openai_client.py`): `response_format={"type": "json_object"}` + JSON 파싱 실패 시 1회 재시도.
+- **프롬프트 정리** (`prompts.py::TEACHER_GENERATE_SENTENCES_PROMPT`): `blanked`/`hint` 필드 제거, is_new "정확히 1개" → "최대 1개", 학습 가치 룰을 최상위 강제 룰로 명시.
+- **Supabase 클라이언트 싱글톤** (`supabase_client.py`): `lru_cache(maxsize=1)`로 매 호출 재생성 제거.
+- **N+1 쿼리 제거** (`teacher.py::generate_sentences`): 모든 lemma를 단일 `in_()` 쿼리로 선조회 후 캐시.
+- **레이트 제한 강화** (`rate_limit.py`): X-Forwarded-For/X-Real-IP 우선, 5분 stale IP GC.
+- **시나리오 평가 UI**: selectbox → 이모지 라디오 (😵 😕 🤔 🙂 😎 🎉), quality≥4면 `st.balloons()`. 중첩 expander 평탄화.
+- **문장 카드 UI**: `.sentence-card` div 경계, 동적 iframe 높이, 단어 클릭 펄스 애니메이션, `st.toast` 피드백, "📋 시나리오로" 라벨화.
+- **대시보드 UI**: "목록 보기"를 `st.expander`로 (전체 rerun 방지), 격려형 빈 상태 문구, 에러 시 ⚠️ 표시.
+
+### Removed
+- **`POST /teacher/generate-words` 엔드포인트**: 단어 리스트 학습은 문장 중심 철학과 충돌 → 제거. `TEACHER_GENERATE_WORDS_PROMPT`/`GenerateWordsRequest`는 미사용.
+- **프롬프트의 `blanked`/`hint` 필드**: 빈칸 연습 폐지 정책과 일치시킴.
+
+### Removed (이전 정리)
+- 미사용 라우터 4개: `coach.py`, `features.py`, `achievements.py`, `transfer.py` + 동반 스키마.
+
 ## [0.3.0] - 2026-02-26 — 문장 중심 학습 시스템
 
 ### Added

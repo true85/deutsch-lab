@@ -1,10 +1,11 @@
-import os
+from functools import lru_cache
 
 from supabase import create_client
 
 from app.config import get_env
 
 
+@lru_cache(maxsize=1)
 def get_supabase_client():
     env = get_env()
     url = env.get("SUPABASE_URL")

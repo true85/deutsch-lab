@@ -14,44 +14,6 @@ If known_words are provided, prefer them and keep new words minimal.
 Return JSON with keys: reply, suggested_reply, new_words.
 """
 
-TEACHER_GENERATE_WORDS_PROMPT = """Task: Generate new German vocabulary tailored to the learner's profile.
-
-Input JSON fields:
-- current_level: learner's CEFR level (e.g. "A1", "B1")
-- avg_mastery: float 0-1 (average mastery of known words)
-- weak_word_lemmas: list of German lemmas the learner struggles with
-- known_lemmas: list of German lemmas the learner already knows
-- count: how many words to generate
-- theme: optional topic/theme for the words
-
-Rules:
-- NEVER generate words already in known_lemmas
-- If avg_mastery >= 0.7, you may include words from the next CEFR level
-- Focus on practical, high-frequency vocabulary
-- Use weak_word_lemmas context to suggest semantically related but new words
-- If theme is provided, all words should relate to that theme
-
-Return ONLY valid JSON (no markdown, no extra text):
-{
-  "words": [
-    {
-      "german": "string",
-      "part_of_speech": "noun|verb|adjective|adverb|preposition|conjunction|other",
-      "gender": "der|die|das|null",
-      "plural": "string or null",
-      "translation": "Korean translation",
-      "example_sentence": "German example sentence using the word",
-      "example_translation": "Korean translation of the example sentence",
-      "level": "A1|A2|B1|B2|C1|C2"
-    }
-  ],
-  "meta": {
-    "theme_used": "string or null",
-    "level_range": "string"
-  }
-}
-"""
-
 TEACHER_GENERATE_SENTENCES_PROMPT = """Task: Generate German practice sentences targeting the learner's weak grammar points.
 
 Input JSON fields:
@@ -64,22 +26,23 @@ Input JSON fields:
 - session_theme: a random topic/situation to base the sentences on (REQUIRED — use it)
 - random_seed: a unique identifier for this request (use it to vary your output every time)
 
-Rules:
-- Prioritize review_due_lemmas above all other words — use as many as possible across the sentences
+Rules (in priority order):
+- LEARNING VALUE RULE (MANDATORY for every sentence): each sentence MUST contain AT LEAST ONE of:
+  (a) a lemma from review_due_lemmas, OR
+  (b) at least one brand-new word with is_new=true (not in known_lemmas).
+  A sentence using only known_lemmas with no new word and no review_due word has NO learning value and is forbidden.
+- TOP PRIORITY: review_due_lemmas — distribute these across the sentences first. Aim to cover at least min(len(review_due_lemmas), 3) of them.
+- If `must_include_lemmas` is provided, EVERY lemma in that list MUST appear in the generated sentences (this overrides all other rules).
 - Each sentence MUST practice a DIFFERENT grammar rule from weak_grammar_rules (cycle through them)
 - Each sentence MUST have a DIFFERENT main verb, subject, and situation — NO repetition across sentences
 - Base all sentences around the session_theme — different aspects of the same theme
-- Actively use words from known_lemmas where natural
+- Actively use words from known_lemmas where natural (these form the base; layer review_due/new on top)
 - Incorporate weak_word_lemmas into sentences where possible
 - Sentences should match current_level difficulty
-- blanked: same sentence with the grammar focus word/phrase replaced by "___"
-- hint: short Korean hint about what goes in the blank
 - words field is REQUIRED — always include ALL nouns, verbs, adjectives, adverbs in the sentence
   (only exclude standalone articles like "der/die/das/ein" and standalone prepositions)
-  - is_new: true ONLY if the lemma is NOT in known_lemmas.
-    REQUIRED: each sentence MUST introduce exactly 1 brand-new German word not in known_lemmas, marked is_new=true.
-    This new word must be a real German word appropriate for current_level.
-    Provide correct german, translation, part_of_speech, gender (if noun), plural (if noun) for is_new words.
+  - is_new: true ONLY if the lemma is NOT in known_lemmas. At most 1 new word per sentence (introduce more only if review_due is empty for that sentence).
+    For is_new words, provide correct german, translation, part_of_speech, gender (if noun), plural (if noun).
 - verbs field is REQUIRED — always include ALL verbs with full present tense conjugation
   (if no conjugatable verb exists, return an empty list [])
 
@@ -90,8 +53,6 @@ Return ONLY valid JSON (no markdown, no extra text):
       "german": "Full German sentence",
       "korean": "Korean translation",
       "grammar_focus": "Name of the grammar rule being practiced",
-      "blanked": "Sentence with ___ replacing the grammar focus element",
-      "hint": "Short Korean hint",
       "words": [
         {"german": "gehen", "translation": "가다", "part_of_speech": "verb",
          "gender": null, "plural": null, "is_new": false},
